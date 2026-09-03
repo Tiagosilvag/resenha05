@@ -31,10 +31,9 @@ export function Login() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="safe-top flex flex-col items-center bg-campo-700 bg-gramada px-6 pb-16 pt-16 text-center text-white">
-        <Logo size={60} aro />
-        <h1 className="mt-4 font-display text-3xl font-bold uppercase tracking-tight text-white">Resenha05</h1>
-        <p className="mt-1 text-sm text-white/80">A pelada organizada do início ao fim.</p>
+      <header className="safe-top flex flex-col items-center bg-campo-700 bg-gramada px-6 pb-16 pt-14 text-center text-white">
+        <Logo size={132} />
+        <p className="mt-3 text-sm text-white/85">A pelada organizada do início ao fim.</p>
       </header>
 
       <div className="mx-auto -mt-10 w-full max-w-sm flex-1 px-6">

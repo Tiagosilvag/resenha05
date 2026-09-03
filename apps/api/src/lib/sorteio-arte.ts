@@ -1,4 +1,4 @@
-import { PALETA, h, elementoParaPng, type El } from './satori-base.js';
+import { PALETA, h, elementoParaPng, logoDataUri, type El } from './satori-base.js';
 
 const { ouro: OURO, ouroEscuro: OURO_ESCURO, creme: CRE, dim: DIM } = PALETA;
 
@@ -43,10 +43,11 @@ function badgeEstrelas(n: number): El {
 }
 
 export async function renderSorteioArtePng(d: DadosSorteioArte): Promise<Buffer> {
+  const logo = await logoDataUri();
   const gapCard = 16;
   const alturaDe = (t: TimeArte) => 54 + t.jogadores.length * 42 + 12;
   const somaCards = d.times.reduce((s, t) => s + alturaDe(t) + gapCard, -gapCard);
-  const altura = PAD * 2 + 150 + 28 + somaCards + 28 + 60;
+  const altura = PAD * 2 + 252 + 28 + somaCards + 28 + 60;
 
   const cartaTime = (t: TimeArte): El =>
     h(
@@ -120,6 +121,7 @@ export async function renderSorteioArtePng(d: DadosSorteioArte): Promise<Buffer>
     h(
       'div',
       { style: { display: 'flex', flexDirection: 'column', alignItems: 'center' } },
+      h('img', { src: logo, style: { display: 'flex', height: 96, width: 64, marginBottom: 6 } }),
       h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 20, color: OURO, letterSpacing: 5 } }, 'SORTEIO DE TIMES'),
       h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 800, fontSize: 42, color: OURO, marginTop: 2, textAlign: 'center', lineHeight: 1 } }, d.organizacao.toUpperCase()),
       h('span', { style: { fontFamily: 'Barlow', fontWeight: 600, fontSize: 21, color: DIM, marginTop: 4 } }, d.quando),
@@ -132,25 +134,7 @@ export async function renderSorteioArtePng(d: DadosSorteioArte): Promise<Buffer>
     h(
       'div',
       { style: { display: 'flex', alignItems: 'center', gap: 12, marginTop: 30 } },
-      h(
-        'div',
-        {
-          style: {
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 42,
-            height: 42,
-            borderRadius: 999,
-            border: `3px solid ${OURO}`,
-            fontFamily: 'Barlow Condensed',
-            fontWeight: 800,
-            fontSize: 20,
-            color: OURO,
-          },
-        },
-        'R5',
-      ),
+      h('img', { src: logo, style: { display: 'flex', height: 54, width: 36 } }),
       h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 22, color: DIM, letterSpacing: 2 } },
         `DIFERENÇA ENTRE OS TIMES: ${d.amplitude} `),
       diamante(12),

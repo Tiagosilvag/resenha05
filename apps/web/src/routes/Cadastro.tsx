@@ -75,9 +75,9 @@ export function Cadastro() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="safe-top flex flex-col items-center bg-campo-700 bg-gramada px-6 pb-14 pt-12 text-center text-white">
-        <Logo size={46} aro />
-        <h1 className="mt-3 font-display text-2xl font-bold uppercase tracking-tight text-white">Criar cadastro</h1>
+      <header className="safe-top flex flex-col items-center bg-campo-700 bg-gramada px-6 pb-14 pt-10 text-center text-white">
+        <Logo size={84} />
+        <h1 className="mt-2 font-display text-2xl font-bold uppercase tracking-tight text-white">Criar cadastro</h1>
       </header>
 
       <div className="mx-auto -mt-9 w-full max-w-sm flex-1 px-6 pb-10">

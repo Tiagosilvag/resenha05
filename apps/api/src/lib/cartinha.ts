@@ -10,7 +10,7 @@ import {
   type Posicao,
 } from '@resenha05/shared';
 import { UPLOADS_DIR } from './uploads.js';
-import { PALETA, h, elementoParaPng, type El } from './satori-base.js';
+import { PALETA, h, elementoParaPng, logoDataUri, type El } from './satori-base.js';
 
 const { ouro: OURO, ouroEscuro: OURO_ESCURO, creme: CRE, dim: DIM } = PALETA;
 
@@ -41,6 +41,7 @@ const A = 1010;
 export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
   const at = calcularAtributos(dados);
   const foto = await fotoDataUri(dados.fotoUrl);
+  const logo = await logoDataUri();
   const recortada = Boolean(dados.fotoRecortada && foto);
   const nome = (dados.nome ?? 'Jogador').toUpperCase();
   const pos = selo(dados.posicao as Posicao | null);
@@ -110,7 +111,7 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
                 },
               }),
             ]
-          : [h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 800, fontSize: 120, color: OURO } }, 'R5')]),
+          : [h('img', { src: logo, style: { height: 300, width: 200, opacity: 0.9 } })]),
       );
 
   const topo: El = h(
@@ -123,26 +124,7 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
       h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 32, color: OURO, letterSpacing: 4, marginTop: 4 } }, pos),
       h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 22, color: DIM, letterSpacing: 3, marginTop: 5 } }, `PÉ ${pe}`),
     ),
-    h(
-      'div',
-      {
-        style: {
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: 96,
-          height: 96,
-          borderRadius: 999,
-          border: `4px solid ${OURO}`,
-          backgroundColor: '#15140f',
-          fontFamily: 'Barlow Condensed',
-          fontWeight: 800,
-          fontSize: 44,
-          color: OURO,
-        },
-      },
-      'R5',
-    ),
+    h('img', { src: logo, style: { display: 'flex', height: 132, width: 88 } }),
   );
 
   const rodape: El = h(

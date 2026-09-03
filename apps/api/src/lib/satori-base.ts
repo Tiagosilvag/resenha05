@@ -1,9 +1,22 @@
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import satori from 'satori';
 import { Resvg } from '@resvg/resvg-js';
 
 const require = createRequire(import.meta.url);
+const aqui = dirname(fileURLToPath(import.meta.url));
+
+let logoCache: string | null = null;
+/** Brasão do Resenha05 como data URI (para embutir nas artes). */
+export async function logoDataUri(): Promise<string> {
+  if (logoCache) return logoCache;
+  // dist/lib -> ../../assets/logo.png (a pasta assets é copiada no Dockerfile)
+  const buf = await readFile(join(aqui, '..', '..', 'assets', 'logo.png'));
+  logoCache = `data:image/png;base64,${buf.toString('base64')}`;
+  return logoCache;
+}
 
 export const PALETA = {
   ouro: '#E7C158',

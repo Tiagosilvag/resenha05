@@ -39,10 +39,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col md:flex-row">
       {/* Sidebar — desktop */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r linha-cal bg-white/70 px-5 pb-6 pt-7 md:flex">
-        <div className="mb-5 flex items-center gap-3">
-          <Logo size={38} />
-          <span className="font-display text-lg font-bold uppercase tracking-tight">Resenha05</span>
+      <aside className="hidden w-60 shrink-0 flex-col border-r linha-cal bg-white/70 px-5 pb-6 pt-6 md:flex">
+        <div className="mb-5 flex justify-center">
+          <Logo size={92} />
         </div>
         <SeletorOrg className="mb-7" />
         <nav className="flex flex-col gap-1">
@@ -69,9 +68,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Conteúdo */}
       <main className="flex-1 pb-24 md:pb-10">
-        <header className="safe-top flex items-center gap-3 border-b border-campo-800 bg-campo-700 bg-gramada px-4 py-3 text-white md:hidden">
-          <Logo size={30} aro />
-          <span className="font-display text-base font-bold uppercase tracking-tight">Resenha05</span>
+        <header className="safe-top flex items-center gap-3 border-b border-campo-800 bg-campo-700 bg-gramada px-4 py-2.5 text-white md:hidden">
+          <Logo size={40} />
+          <span className="font-display text-lg font-bold uppercase tracking-tight">Resenha05</span>
           <SeletorOrg className="ml-auto max-w-[46%]" />
         </header>
         <div className="px-4 py-5 md:px-9 md:py-9">{children}</div>
