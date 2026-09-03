@@ -32,13 +32,15 @@ O front chama sempre `/api/*`; em dev o Vite faz proxy para `http://localhost:30
 
 ## Deploy (Coolify)
 
-Dois apps a partir deste repo:
+Dois apps **Dockerfile** a partir deste repo (Base Directory `/`, o Dockerfile
+copia do root do monorepo):
 
-- **`resenha05-api`** — `docker build -f apps/api/Dockerfile .` · porta 3000 · sem porta pública.
-  Env: `DATABASE_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `RESENHA05_ENC_KEY`, `R2_*`.
-  O container roda as migrations pendentes no start.
-- **`resenha05-web`** — `docker build -f apps/web/Dockerfile .` · nginx na porta 80,
-  faz proxy de `/api` para `resenha05-api:3000`. Domínio: `resenha05.coffetech.com.br`.
+- **`resenha05-api`** — Dockerfile `apps/api/Dockerfile` · porta 3000 · domínio
+  `api-resenha05.coffetech.com.br`. O container roda as migrations no start.
+  Env: `DATABASE_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `RESENHA05_ENC_KEY`,
+  `WEB_ORIGIN=https://resenha05.coffetech.com.br`, `R2_*`, `NODE_ENV=production`.
+- **`resenha05-web`** — Dockerfile `apps/web/Dockerfile` · nginx porta 80 ·
+  domínio `resenha05.coffetech.com.br`. **Build arg** `VITE_API_URL=https://api-resenha05.coffetech.com.br/api`.
 
 Fases 1 a 5 implementadas: cadastro + LGPD, complete seu cadastro, administração,
 peladas + lista de presença (polling), sorteio balanceado.
