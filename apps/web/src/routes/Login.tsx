@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { formatarTelefone, normalizarTelefone } from '@resenha05/shared';
+import { mascararTelefone, normalizarTelefone } from '@resenha05/shared';
 import { useAuth } from '../lib/auth';
 import { ApiError } from '../lib/api';
 import { Button, Field, Input, Aviso, Spinner } from '../components/ui';
@@ -31,7 +31,7 @@ export function Login() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="safe-top flex flex-col items-center bg-noite bg-brasao px-6 pb-16 pt-14 text-center text-white">
+      <header className="flex flex-col items-center bg-noite bg-brasao px-6 pb-16 pt-[calc(env(safe-area-inset-top)+4rem)] text-center text-white">
         <Logo size={132} />
         <p className="mt-3 text-sm text-white/85">A pelada organizada do início ao fim.</p>
       </header>
@@ -47,9 +47,9 @@ export function Login() {
               inputMode="tel"
               autoComplete="tel"
               placeholder="(11) 91234-5678"
+              maxLength={15}
               value={telefone}
-              onChange={(e) => setTelefone(e.target.value)}
-              onBlur={() => telefone && setTelefone(formatarTelefone(normalizarTelefone(telefone)))}
+              onChange={(e) => setTelefone(mascararTelefone(e.target.value))}
               required
             />
           </Field>

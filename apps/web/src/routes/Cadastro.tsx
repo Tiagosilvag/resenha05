@@ -1,6 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { cadastroSchema, formatarTelefone, normalizarTelefone } from '@resenha05/shared';
+import { cadastroSchema, mascararTelefone } from '@resenha05/shared';
 import { useAuth } from '../lib/auth';
 import { ApiError } from '../lib/api';
 import { enviarFoto } from '../lib/foto';
@@ -76,7 +76,7 @@ export function Cadastro() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="safe-top flex flex-col items-center bg-noite bg-brasao px-6 pb-14 pt-10 text-center text-white">
+      <header className="flex flex-col items-center bg-noite bg-brasao px-6 pb-14 pt-[calc(env(safe-area-inset-top)+3rem)] text-center text-white">
         <Logo size={92} />
         <h1 className="mt-3 font-display text-2xl font-bold uppercase tracking-tight text-campo-300">Criar cadastro</h1>
       </header>
@@ -131,10 +131,11 @@ export function Cadastro() {
           <Field label="Telefone (WhatsApp)" dica="Só um número por pessoa.">
             <Input
               inputMode="tel"
+              autoComplete="tel"
               placeholder="(11) 91234-5678"
+              maxLength={15}
               value={telefone}
-              onChange={(e) => setTelefone(e.target.value)}
-              onBlur={() => telefone && setTelefone(formatarTelefone(normalizarTelefone(telefone)))}
+              onChange={(e) => setTelefone(mascararTelefone(e.target.value))}
               required
             />
           </Field>

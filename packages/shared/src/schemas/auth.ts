@@ -1,11 +1,13 @@
 import { z } from 'zod';
-import { normalizarTelefone, telefoneValido } from '../telefone.js';
+import { normalizarTelefone, telefoneCelularValido } from '../telefone.js';
 
 const telefone = z
   .string()
   .trim()
   .transform(normalizarTelefone)
-  .refine(telefoneValido, { message: 'Telefone inválido: use DDD + número.' });
+  .refine(telefoneCelularValido, {
+    message: 'Digite o número completo com DDD: (XX) XXXXX-XXXX.',
+  });
 
 const senha = z
   .string()

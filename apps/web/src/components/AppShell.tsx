@@ -50,7 +50,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col md:flex-row">
       {/* Sidebar — desktop */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r linha-cal bg-gramado-raised/70 px-5 pb-6 pt-7 md:flex">
+      <aside className="hidden w-60 shrink-0 flex-col border-r linha-cal bg-gramado-raised/70 px-5 pb-6 pt-10 md:flex">
         <div className="mb-6 flex justify-center border-b border-campo-500/20 pb-6">
           <Logo size={104} />
         </div>
@@ -79,7 +79,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Conteúdo */}
       <main className="flex-1 pb-24 md:pb-10">
-        <header className="safe-top relative flex items-center justify-center border-b border-campo-500/25 bg-noite bg-brasao px-4 py-3 text-white md:hidden">
+        <header className="relative flex items-center justify-center border-b border-campo-500/25 bg-noite bg-brasao px-4 pb-3 pt-[calc(env(safe-area-inset-top)+1rem)] text-white md:hidden">
           <Logo size={48} />
           <div className="absolute right-3 top-1/2 -translate-y-1/2 max-w-[44%]">
             <SeletorOrg escuro />

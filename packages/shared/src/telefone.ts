@@ -5,6 +5,7 @@
  */
 
 const CANONICO = /^\+55\d{10,11}$/;
+const CELULAR = /^\+55\d{2}9\d{8}$/;
 
 /** Remove tudo que não for dígito ou `+` e garante o prefixo `+`. */
 export function normalizarTelefone(entrada: string): string {
@@ -16,6 +17,25 @@ export function normalizarTelefone(entrada: string): string {
 
 export function telefoneValido(entrada: string): boolean {
   return CANONICO.test(normalizarTelefone(entrada));
+}
+
+/** Celular BR: DDD + 9 + 8 dígitos, ou seja `(XX) XXXXX-XXXX`. */
+export function telefoneCelularValido(entrada: string): boolean {
+  return CELULAR.test(normalizarTelefone(entrada));
+}
+
+/**
+ * Máscara progressiva para digitação. Aceita só dígitos (corta em 11) e
+ * devolve `(XX) XXXXX-XXXX` conforme a pessoa digita.
+ */
+export function mascararTelefone(entrada: string): string {
+  let d = entrada.replace(/\D/g, '');
+  if (d.length > 11 && d.startsWith('55')) d = d.slice(2); // colou com +55
+  d = d.slice(0, 11);
+  if (d.length === 0) return '';
+  if (d.length <= 2) return `(${d}`;
+  if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
 
 /** Normaliza e valida; lança se inválido. Retorna o formato canônico. */
