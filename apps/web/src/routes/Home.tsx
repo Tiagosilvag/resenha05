@@ -71,10 +71,13 @@ export function Home() {
         ) : (
           <Card>
             <p className="text-sm text-black/55">
-              Você ainda não está em nenhuma pelada. Peça o link de convite ao organizador.
+              Você ainda não está em nenhuma pelada. Peça o link de convite ao organizador — ou crie a sua.
             </p>
           </Card>
         )}
+        <Link to="/nova-organizacao" className="mt-2 inline-block text-sm font-semibold text-campo-700">
+          + Criar minha organização
+        </Link>
       </section>
 
       <Link to="/peladas">

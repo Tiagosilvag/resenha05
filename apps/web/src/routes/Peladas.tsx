@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DIAS_SEMANA, criarConfiguracaoSchema } from '@resenha05/shared';
-import { useAuth } from '../lib/auth';
 import { api, ApiError } from '../lib/api';
+import { useOrg } from '../lib/org';
 import { Aviso, Button, Card, Field, Input, Select, Spinner } from '../components/ui';
 
 interface Config {
@@ -25,11 +25,7 @@ interface Pelada {
 }
 
 export function Peladas() {
-  const { usuario } = useAuth();
-  const orgs = usuario?.organizacoes ?? [];
-  const [orgId, setOrgId] = useState(orgs[0]?.id ?? '');
-  const org = orgs.find((o) => o.id === orgId);
-  const admin = org?.papel === 'admin' || org?.papel === 'admin_principal';
+  const { orgId, admin } = useOrg();
   const qc = useQueryClient();
   const [erro, setErro] = useState<string | null>(null);
   const [novaAberta, setNovaAberta] = useState(false);
@@ -68,16 +64,6 @@ export function Peladas() {
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-xl font-extrabold tracking-tight">Peladas</h1>
-
-      {orgs.length > 1 && (
-        <Select value={orgId} onChange={(e) => setOrgId(e.target.value)}>
-          {orgs.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.nome}
-            </option>
-          ))}
-        </Select>
-      )}
       {erro && <Aviso tipo="erro">{erro}</Aviso>}
 
       <section>

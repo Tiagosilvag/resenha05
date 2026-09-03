@@ -41,6 +41,14 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
     return org;
   });
 
+  // Encerra a organização (só o dono). Cascade apaga peladas, membros, torneios.
+  app.delete('/organizacoes/:id', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    exigirDono(req, id);
+    await db.deleteFrom('organizacoes').where('id', '=', id).execute();
+    reply.code(204);
+  });
+
   app.get('/organizacoes/:id', async (req) => {
     const { id } = req.params as { id: string };
     exigirMembro(req, id);

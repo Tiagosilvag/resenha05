@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { criarTorneioSchema, FORMATOS_TORNEIO } from '@resenha05/shared';
 import { api, ApiError } from '../lib/api';
-import { useOrgSelecionada } from '../lib/org';
+import { useOrg } from '../lib/org';
 import { Aviso, Button, Card, Field, Input, Select, Spinner } from '../components/ui';
 
 interface Torneio {
@@ -21,7 +21,7 @@ const ROTULO_FORMATO: Record<string, string> = {
 };
 
 export function Torneios() {
-  const { orgs, orgId, setOrgId, admin } = useOrgSelecionada();
+  const { orgId, admin } = useOrg();
   const qc = useQueryClient();
   const [novo, setNovo] = useState(false);
 
@@ -41,12 +41,6 @@ export function Torneios() {
         <h1 className="text-xl font-extrabold tracking-tight">Torneios e copas</h1>
         <Link to="/artilharia" className="text-sm font-semibold text-campo-700">Artilharia →</Link>
       </div>
-
-      {orgs.length > 1 && (
-        <Select value={orgId} onChange={(e) => setOrgId(e.target.value)}>
-          {orgs.map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}
-        </Select>
-      )}
 
       {admin && (
         <button className="self-start text-sm font-semibold text-campo-700" onClick={() => setNovo((v) => !v)}>

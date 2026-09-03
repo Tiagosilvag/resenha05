@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
-import { useOrgSelecionada } from '../lib/org';
+import { useOrg } from '../lib/org';
 import { Avatar, Card, Select, Spinner } from '../components/ui';
 
 interface LinhaRanking {
@@ -17,7 +17,7 @@ interface ArtilhariaResp {
 }
 
 export function Artilharia() {
-  const { orgs, orgId, setOrgId } = useOrgSelecionada();
+  const { orgId } = useOrg();
   const [periodo, setPeriodo] = useState('mes');
 
   const { data, isLoading } = useQuery({
@@ -32,18 +32,11 @@ export function Artilharia() {
     <div className="flex flex-col gap-4">
       <h1 className="text-xl font-extrabold tracking-tight">Artilharia</h1>
 
-      <div className="flex gap-2">
-        {orgs.length > 1 && (
-          <Select value={orgId} onChange={(e) => setOrgId(e.target.value)}>
-            {orgs.map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}
-          </Select>
-        )}
-        <Select value={periodo} onChange={(e) => setPeriodo(e.target.value)}>
-          <option value="mes">Este mês</option>
-          <option value="ano">Este ano</option>
-          <option value="sempre">Desde sempre</option>
-        </Select>
-      </div>
+      <Select value={periodo} onChange={(e) => setPeriodo(e.target.value)} className="max-w-[12rem]">
+        <option value="mes">Este mês</option>
+        <option value="ano">Este ano</option>
+        <option value="sempre">Desde sempre</option>
+      </Select>
 
       {isLoading ? (
         <Spinner className="h-6 w-6 text-campo-600" />

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatarTelefone } from '@resenha05/shared';
 import { useAuth } from '../lib/auth';
@@ -18,7 +18,8 @@ interface Membro {
 
 export function Administradores() {
   const { orgId = '' } = useParams();
-  const { usuario } = useAuth();
+  const { usuario, recarregar } = useAuth();
+  const nav = useNavigate();
   const qc = useQueryClient();
   const [busca, setBusca] = useState('');
   const [erro, setErro] = useState<string | null>(null);
@@ -114,6 +115,26 @@ export function Administradores() {
           </Card>
         ))}
       </div>
+
+      {souDono && (
+        <Card>
+          <button
+            className="w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"
+            onClick={async () => {
+              if (!confirm('Encerrar esta organização? Peladas, torneios e vínculos serão apagados.')) return;
+              try {
+                await api(`/organizacoes/${orgId}`, { method: 'DELETE' });
+                await recarregar();
+                nav('/', { replace: true });
+              } catch (e) {
+                setErro(e instanceof ApiError ? e.message : 'Não foi possível encerrar.');
+              }
+            }}
+          >
+            Encerrar organização
+          </button>
+        </Card>
+      )}
     </div>
   );
 }

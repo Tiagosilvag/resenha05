@@ -15,6 +15,7 @@ import { Torneios } from './routes/Torneios';
 import { Torneio } from './routes/Torneio';
 import { Jogo } from './routes/Jogo';
 import { Artilharia } from './routes/Artilharia';
+import { NovaOrganizacao } from './routes/NovaOrganizacao';
 import { EntrarOrg } from './routes/EntrarOrg';
 
 function Protegida({ children }: { children: ReactNode }) {
@@ -47,6 +48,7 @@ export function App() {
       <Route path="/torneios/:torneioId" element={<Protegida><Torneio /></Protegida>} />
       <Route path="/jogos/:jogoId" element={<Protegida><Jogo /></Protegida>} />
       <Route path="/artilharia" element={<Protegida><Artilharia /></Protegida>} />
+      <Route path="/nova-organizacao" element={<Protegida><NovaOrganizacao /></Protegida>} />
       <Route path="/org/:orgId/admins" element={<Protegida><Administradores /></Protegida>} />
       <Route path="/entrar-org/:orgId" element={<Protegida><EntrarOrg /></Protegida>} />
 
