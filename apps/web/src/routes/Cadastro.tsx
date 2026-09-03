@@ -2,8 +2,8 @@ import { useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { cadastroSchema, formatarTelefone, normalizarTelefone } from '@resenha05/shared';
 import { useAuth } from '../lib/auth';
-import { api, ApiError } from '../lib/api';
-import { enviarFoto, FotoIndisponivel } from '../lib/foto';
+import { ApiError } from '../lib/api';
+import { enviarFoto } from '../lib/foto';
 import { Button, Field, Input, Aviso, Spinner, Avatar } from '../components/ui';
 import { Logo } from '../components/Logo';
 
@@ -57,14 +57,9 @@ export function Cadastro() {
     try {
       await cadastrar(parsed.data);
       try {
-        const fotoUrl = await enviarFoto(foto);
-        await api('/perfil', { method: 'PATCH', json: { fotoUrl } });
-      } catch (e) {
-        setAviso(
-          e instanceof FotoIndisponivel
-            ? 'Conta criada. O envio de foto ainda não está ativo — adicione no Perfil depois.'
-            : 'Conta criada, mas a foto não subiu. Tente de novo no Perfil.',
-        );
+        await enviarFoto(foto);
+      } catch {
+        setAviso('Conta criada, mas a foto não subiu. Tente de novo no Perfil.');
       }
       await recarregar();
       nav('/', { replace: true });

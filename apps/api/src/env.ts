@@ -21,11 +21,8 @@ const schema = z.object({
 
   WEB_ORIGIN: z.string().default('http://localhost:5173'),
 
-  R2_ACCOUNT_ID: z.string().optional(),
-  R2_ACCESS_KEY_ID: z.string().optional(),
-  R2_SECRET_ACCESS_KEY: z.string().optional(),
-  R2_BUCKET: z.string().default('resenha05-avatars'),
-  R2_PUBLIC_URL: z.string().url().optional(),
+  // Pasta onde as fotos de perfil são gravadas (volume no compose).
+  UPLOADS_DIR: z.string().default('uploads'),
 
   N8N_PAGAMENTO_WEBHOOK_URL: z.string().url().optional(),
   MERCADOPAGO_PLATAFORMA_TOKEN: z.string().optional(),
@@ -54,6 +51,3 @@ if (env.RESENHA05_ENC_KEY && Buffer.from(env.RESENHA05_ENC_KEY, 'base64').length
   );
 }
 
-export const r2Configurado = Boolean(
-  env.R2_ACCOUNT_ID && env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY && env.R2_PUBLIC_URL,
-);

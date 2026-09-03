@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { formatarTelefone } from '@resenha05/shared';
 import { useAuth } from '../lib/auth';
 import { api, ApiError } from '../lib/api';
-import { enviarFoto, FotoIndisponivel } from '../lib/foto';
+import { enviarFoto } from '../lib/foto';
 import { Avatar, Aviso, Button, Card, Field, Input, Spinner } from '../components/ui';
 
 export function Perfil() {
@@ -36,15 +36,11 @@ export function Perfil() {
   async function trocarFoto(f: File) {
     setMsg(null);
     try {
-      const url = await enviarFoto(f);
-      await api('/perfil', { method: 'PATCH', json: { fotoUrl: url } });
+      await enviarFoto(f);
       await recarregar();
       setMsg({ tipo: 'ok', texto: 'Foto atualizada.' });
     } catch (e) {
-      setMsg({
-        tipo: 'erro',
-        texto: e instanceof FotoIndisponivel ? 'Envio de foto ainda não configurado.' : 'Falha ao enviar a foto.',
-      });
+      setMsg({ tipo: 'erro', texto: e instanceof ApiError ? e.message : 'Falha ao enviar a foto.' });
     }
   }
 

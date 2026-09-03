@@ -10,7 +10,8 @@
 #   JWT_REFRESH_SECRET     openssl rand -base64 48
 #   RESENHA05_ENC_KEY      openssl rand -base64 32   (exatamente 32 bytes)
 #   WEB_ORIGIN             https://resenha05.coffetech.com.br
-#   (R2_* — opcional, para upload de foto; sem eles o cadastro pede a foto depois)
+#
+# As fotos de perfil ficam no volume `avatars` (servidas pela própria API).
 #
 # E aponte o domínio (resenha05.coffetech.com.br) para o serviço "web", porta 80.
 # =============================================================================
@@ -50,11 +51,9 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       RESENHA05_ENC_KEY: ${RESENHA05_ENC_KEY}
       WEB_ORIGIN: ${WEB_ORIGIN:-https://resenha05.coffetech.com.br}
-      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
-      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
-      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
-      R2_BUCKET: ${R2_BUCKET:-resenha05-avatars}
-      R2_PUBLIC_URL: ${R2_PUBLIC_URL:-}
+      UPLOADS_DIR: /data/uploads
+    volumes:
+      - avatars:/data/uploads
     healthcheck:
       test:
         - CMD
@@ -78,3 +77,4 @@ services:
 
 volumes:
   db_data:
+  avatars:

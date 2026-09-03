@@ -22,3 +22,6 @@ apps/web/android/app/upload.keystore
 apps/web/ios/App/Pods/
 apps/web/ios/App/build/
 apps/web/.capacitor/
+
+# Fotos de perfil (dev)
+apps/api/uploads/

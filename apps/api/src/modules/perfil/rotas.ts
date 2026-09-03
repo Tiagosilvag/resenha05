@@ -1,5 +1,4 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { randomUUID } from 'node:crypto';
 import {
   atualizarPerfilSchema,
   perfilExtraSchema,
@@ -8,7 +7,9 @@ import {
 import { db } from '../../db/index.js';
 import { validar } from '../../lib/validar.js';
 import { erro } from '../../lib/erros.js';
-import { gerarUrlUpload, r2Pronto } from '../../lib/r2.js';
+import { salvarAvatar, extPara } from '../../lib/uploads.js';
+
+const TAM_MAX = 6 * 1024 * 1024;
 
 export const rotasPerfil: FastifyPluginAsync = async (app) => {
   app.addHook('preHandler', app.autenticar);
@@ -83,16 +84,28 @@ export const rotasPerfil: FastifyPluginAsync = async (app) => {
     return { ok: true };
   });
 
-  // Fase 1 — upload de foto: a API devolve uma URL PUT pré-assinada do R2.
-  app.post('/perfil/foto/upload-url', async (req) => {
-    if (!r2Pronto()) throw erro.invalido('Armazenamento de fotos não configurado.');
-    const body = (req.body ?? {}) as { contentType?: string };
-    const tipo = body.contentType ?? 'image/jpeg';
-    if (!/^image\/(jpeg|png|webp)$/.test(tipo)) {
-      throw erro.invalido('Envie uma imagem JPEG, PNG ou WebP.');
+  // Fase 1 — upload de foto: multipart direto, gravado num volume do servidor.
+  app.post('/perfil/foto', async (req) => {
+    const arquivo = await req.file({ limits: { fileSize: TAM_MAX } });
+    if (!arquivo) throw erro.invalido('Envie uma imagem no campo "foto".');
+
+    const ext = extPara(arquivo.mimetype);
+    if (!ext) throw erro.invalido('Formato inválido. Use JPEG, PNG ou WebP.');
+
+    let dados: Buffer;
+    try {
+      dados = await arquivo.toBuffer();
+    } catch {
+      throw erro.invalido('Imagem muito grande (máx. 6 MB).');
     }
-    const ext = tipo.split('/')[1]!.replace('jpeg', 'jpg');
-    const chave = `avatars/${req.usuario.id}/${randomUUID()}.${ext}`;
-    return gerarUrlUpload(chave, tipo);
+    if (arquivo.file.truncated) throw erro.invalido('Imagem muito grande (máx. 6 MB).');
+
+    const fotoUrl = await salvarAvatar(req.usuario.id, dados, ext);
+    await db
+      .updateTable('profiles')
+      .set({ foto_url: fotoUrl })
+      .where('id', '=', req.usuario.id)
+      .execute();
+    return { fotoUrl };
   });
 };

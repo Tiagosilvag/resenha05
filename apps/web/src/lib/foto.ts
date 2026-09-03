@@ -1,34 +1,22 @@
-import { api, ApiError } from './api';
-
-interface UrlUpload {
-  uploadUrl: string;
-  publicUrl: string;
-  expiraEmSegundos: number;
-}
+import { tokens, ApiError } from './api';
 
 export class FotoIndisponivel extends Error {}
 
 /**
- * Sobe a foto para o R2 via URL pré-assinada e devolve a URL pública.
- * Lança FotoIndisponivel se o armazenamento ainda não estiver configurado.
+ * Envia a foto de perfil (multipart) para a API, que grava no servidor e
+ * atualiza o perfil. Devolve a URL pública da imagem.
  */
 export async function enviarFoto(arquivo: File): Promise<string> {
-  let dados: UrlUpload;
-  try {
-    dados = await api<UrlUpload>('/perfil/foto/upload-url', {
-      method: 'POST',
-      json: { contentType: arquivo.type },
-    });
-  } catch (e) {
-    if (e instanceof ApiError && e.status === 422) throw new FotoIndisponivel(e.message);
-    throw e;
-  }
+  const fd = new FormData();
+  fd.append('foto', arquivo);
 
-  const put = await fetch(dados.uploadUrl, {
-    method: 'PUT',
-    headers: { 'content-type': arquivo.type },
-    body: arquivo,
-  });
-  if (!put.ok) throw new Error('Falha ao enviar a foto. Tente outra imagem.');
-  return dados.publicUrl;
+  const headers = new Headers();
+  if (tokens.access) headers.set('authorization', `Bearer ${tokens.access}`);
+
+  const resp = await fetch('/api/perfil/foto', { method: 'POST', body: fd, headers });
+  const corpo = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    throw new ApiError(resp.status, (corpo as { erro?: string }).erro ?? 'Falha ao enviar a foto.');
+  }
+  return (corpo as { fotoUrl: string }).fotoUrl;
 }

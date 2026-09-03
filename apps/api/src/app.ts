@@ -1,10 +1,13 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import sensible from '@fastify/sensible';
+import multipart from '@fastify/multipart';
+import fastifyStatic from '@fastify/static';
 import { ZodError } from 'zod';
 import { env } from './env.js';
 import { AppError } from './lib/erros.js';
 import { pingDb } from './db/index.js';
+import { UPLOADS_DIR, garantirPastaUploads } from './lib/uploads.js';
 import authPlugin from './plugins/auth.js';
 import { rotasAuth } from './modules/auth/rotas.js';
 import { rotasPerfil } from './modules/perfil/rotas.js';
@@ -24,12 +27,26 @@ export async function construirApp() {
     bodyLimit: 1_048_576,
   });
 
+  await garantirPastaUploads();
+
   await app.register(sensible);
   await app.register(cors, {
     origin: env.NODE_ENV === 'development' ? true : env.WEB_ORIGIN,
     credentials: true,
   });
+  await app.register(multipart, { limits: { files: 1, fileSize: 6 * 1024 * 1024 } });
   await app.register(authPlugin);
+
+  // Fotos de perfil — servidas do volume, cache longo.
+  await app.register(fastifyStatic, {
+    root: UPLOADS_DIR,
+    prefix: '/api/uploads/',
+    decorateReply: false,
+    cacheControl: true,
+    maxAge: '7d',
+    index: false,
+    list: false,
+  });
 
   app.setErrorHandler((err: unknown, req, reply) => {
     if (err instanceof AppError) {
