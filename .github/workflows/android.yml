@@ -26,7 +26,9 @@ jobs:
         run: npm ci
 
       - name: Build do front
-        run: npm run build -w @resenha05/web
+        run: |
+          npm run build -w @resenha05/shared
+          npm run build -w @resenha05/web
 
       - uses: actions/setup-java@v4
         with:
