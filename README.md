@@ -30,17 +30,25 @@ npm run dev:web
 
 O front chama sempre `/api/*`; em dev o Vite faz proxy para `http://localhost:3000`.
 
-## Deploy (Coolify)
+## Deploy (Coolify — um recurso só, Docker Compose)
 
-Dois apps **Dockerfile** a partir deste repo (Base Directory `/`, o Dockerfile
-copia do root do monorepo):
+Build pack **Docker Compose**, arquivo `docker-compose.yml` na raiz. Sobe 3
+containers (`db`, `api`, `web`) numa rede interna. O `web` (nginx) faz proxy de
+`/api` para o `api` — um domínio só, sem CORS.
 
-- **`resenha05-api`** — Dockerfile `apps/api/Dockerfile` · porta 3000 · domínio
-  `api-resenha05.coffetech.com.br`. O container roda as migrations no start.
-  Env: `DATABASE_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `RESENHA05_ENC_KEY`,
-  `WEB_ORIGIN=https://resenha05.coffetech.com.br`, `R2_*`, `NODE_ENV=production`.
-- **`resenha05-web`** — Dockerfile `apps/web/Dockerfile` · nginx porta 80 ·
-  domínio `resenha05.coffetech.com.br`. **Build arg** `VITE_API_URL=https://api-resenha05.coffetech.com.br/api`.
+Variáveis no Coolify:
+
+| Variável | Valor |
+|---|---|
+| `POSTGRES_PASSWORD` | senha do banco |
+| `JWT_SECRET` | `openssl rand -base64 48` |
+| `JWT_REFRESH_SECRET` | `openssl rand -base64 48` |
+| `RESENHA05_ENC_KEY` | `openssl rand -base64 32` (32 bytes exatos) |
+| `WEB_ORIGIN` | `https://resenha05.coffetech.com.br` |
+| `R2_*` | opcional (upload de foto) |
+
+Domínio `resenha05.coffetech.com.br` → serviço `web`, porta 80. A API roda as
+migrations pendentes toda vez que o container sobe.
 
 Fases 1 a 5 implementadas: cadastro + LGPD, complete seu cadastro, administração,
 peladas + lista de presença (polling), sorteio balanceado.

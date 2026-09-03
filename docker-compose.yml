@@ -1,0 +1,77 @@
+# =============================================================================
+# Resenha05 — stack completo num recurso só (Coolify: build pack "Docker Compose")
+# =============================================================================
+# 3 containers: banco + API + web. Um domínio, uma rede interna.
+# O nginx do "web" faz proxy de /api para o container "api" (mesma rede compose).
+#
+# No Coolify, defina estas variáveis (Environment Variables):
+#   POSTGRES_PASSWORD      senha do banco resenha05_app
+#   JWT_SECRET             openssl rand -base64 48
+#   JWT_REFRESH_SECRET     openssl rand -base64 48
+#   RESENHA05_ENC_KEY      openssl rand -base64 32   (exatamente 32 bytes)
+#   WEB_ORIGIN             https://resenha05.coffetech.com.br
+#   (R2_* — opcional, para upload de foto; sem eles o cadastro pede a foto depois)
+#
+# E aponte o domínio (resenha05.coffetech.com.br) para o serviço "web", porta 80.
+# =============================================================================
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: resenha05
+      POSTGRES_USER: resenha05_app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U resenha05_app -d resenha05']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgres://resenha05_app:${POSTGRES_PASSWORD}@db:5432/resenha05
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      RESENHA05_ENC_KEY: ${RESENHA05_ENC_KEY}
+      WEB_ORIGIN: ${WEB_ORIGIN:-https://resenha05.coffetech.com.br}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_BUCKET: ${R2_BUCKET:-resenha05-avatars}
+      R2_PUBLIC_URL: ${R2_PUBLIC_URL:-}
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:3000/api/health').then(r=>{process.exit(r.ok?0:1)}).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    expose:
+      - '80'
+
+volumes:
+  db_data:
