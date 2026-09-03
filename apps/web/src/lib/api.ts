@@ -1,11 +1,10 @@
 /**
- * Cliente HTTP da API. Base:
- *  - dev: `/api` (proxy do Vite para localhost:3000)
- *  - prod: VITE_API_URL (ex.: https://api-resenha05.coffetech.com.br/api),
- *    definida como build arg no Coolify. Cai para `/api` se não houver.
+ * Cliente HTTP da API — sempre mesma origem, prefixo /api:
+ *  - dev: proxy do Vite para localhost:3000 (vite.config.ts)
+ *  - prod: o nginx do container `web` faz proxy de /api para `api:3000`
  * Guarda os tokens no localStorage e renova o access token com o refresh.
  */
-const BASE = (import.meta.env.VITE_API_URL ?? '/api').replace(/\/$/, '');
+const BASE = '/api';
 
 const CHAVE_ACCESS = 'r5.access';
 const CHAVE_REFRESH = 'r5.refresh';
