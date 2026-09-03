@@ -22,13 +22,17 @@ export function Cartinha({
   orgId,
   nome,
   baixavel = false,
+  chave,
 }: {
   profileId: string;
   orgId: string;
   nome?: string | null;
   baixavel?: boolean;
+  /** muda quando a foto/estrelas do jogador mudam — força rebuscar */
+  chave?: string | null;
 }) {
-  const url = `/api/jogadores/${profileId}/cartinha.png?org=${orgId}`;
+  const sufixo = chave ? `&v=${encodeURIComponent(chave)}` : '';
+  const url = `/api/jogadores/${profileId}/cartinha.png?org=${orgId}${sufixo}`;
   const [src, setSrc] = useState<string | null>(cache.get(url) ?? null);
   const [erro, setErro] = useState(false);
 

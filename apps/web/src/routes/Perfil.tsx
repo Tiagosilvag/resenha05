@@ -123,7 +123,13 @@ export function Perfil() {
       {usuario && orgId && (
         <section>
           <Eyebrow>Minha cartinha</Eyebrow>
-          <Cartinha profileId={usuario.id} orgId={orgId} nome={usuario.nome} baixavel />
+          <Cartinha
+            profileId={usuario.id}
+            orgId={orgId}
+            nome={usuario.nome}
+            baixavel
+            chave={`${usuario.fotoUrl ?? ''}|${usuario.fotoRecortada ? 1 : 0}`}
+          />
         </section>
       )}
 

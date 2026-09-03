@@ -110,7 +110,12 @@ async function servirComCache(reply: FastifyReply, chave: string, gerar: () => P
     }
     await writeFile(arquivo, png);
   }
-  reply.header('content-type', 'image/png').header('cache-control', 'public, max-age=300').send(png);
+  // `private`: a cartinha é por-usuário e a URL é fixa — não pode ser
+  // guardada por CDN/proxy compartilhado (vazaria a carta de um pro outro).
+  reply
+    .header('content-type', 'image/png')
+    .header('cache-control', 'private, max-age=30, must-revalidate')
+    .send(png);
 }
 
 export const rotasCartinha: FastifyPluginAsync = async (app) => {
