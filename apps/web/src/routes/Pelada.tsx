@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../lib/auth';
 import { api, ApiError } from '../lib/api';
-import { Avatar, Aviso, Button, Card, Estrelas, Spinner } from '../components/ui';
+import { Avatar, Aviso, Button, Card, Chip, Estrelas, Eyebrow, Spinner, StatTile } from '../components/ui';
 
 interface Presenca {
   profileId: string;
@@ -13,16 +13,17 @@ interface Presenca {
   estrelas: number | null;
 }
 interface PeladaResp {
-  pelada: { id: string; organizacao_id: string; status: string; data: string; hora: string | null; local: string | null };
+  pelada: {
+    id: string;
+    organizacao_id: string;
+    status: string;
+    data: string;
+    hora: string | null;
+    local: string | null;
+  };
   presencas: Presenca[];
   minhaPresenca: Presenca | null;
 }
-
-const CORES: Record<string, string> = {
-  confirmado: 'bg-campo-100 text-campo-700',
-  pago: 'bg-emerald-100 text-emerald-700',
-  desistiu: 'bg-black/5 text-black/40 line-through',
-};
 
 export function Pelada() {
   const { peladaId = '' } = useParams();
@@ -33,7 +34,7 @@ export function Pelada() {
   const { data, isLoading } = useQuery({
     queryKey: ['pelada', peladaId],
     queryFn: () => api<PeladaResp>(`/peladas/${peladaId}`),
-    refetchInterval: 8000, // lista "ao vivo" via polling (MVP)
+    refetchInterval: 8000,
   });
 
   const org = usuario?.organizacoes.find((o) => o.id === data?.pelada.organizacao_id);
@@ -45,7 +46,6 @@ export function Pelada() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['pelada', peladaId] }),
     onError: (e) => setErro(e instanceof ApiError ? e.message : 'Erro.'),
   });
-
   const sairDaLista = useMutation({
     mutationFn: () => api(`/peladas/${peladaId}/presenca`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['pelada', peladaId] }),
@@ -54,54 +54,69 @@ export function Pelada() {
   if (isLoading || !data) return <Spinner className="h-6 w-6 text-campo-600" />;
 
   const confirmados = data.presencas.filter((p) => p.status !== 'desistiu');
+  const pagos = data.presencas.filter((p) => p.status === 'pago').length;
+  const dataFmt = new Date(data.pelada.data + 'T00:00:00').toLocaleDateString('pt-BR', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+  });
+  const dentro = data.minhaPresenca && data.minhaPresenca.status !== 'desistiu';
 
   return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-xl font-extrabold tracking-tight">
-          {new Date(data.pelada.data + 'T00:00:00').toLocaleDateString('pt-BR', {
-            weekday: 'long',
-            day: '2-digit',
-            month: 'long',
-          })}
-        </h1>
-        <p className="text-sm text-black/55">
+    <div className="flex flex-col gap-5">
+      {/* cabeçalho */}
+      <div className="overflow-hidden rounded-2xl bg-campo-700 bg-gramada p-5 text-white shadow-pop">
+        <p className="font-display text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-white/70">
+          Próxima pelada
+        </p>
+        <h1 className="mt-1 font-display text-2xl font-bold capitalize tracking-tight text-white">{dataFmt}</h1>
+        <p className="mt-0.5 text-sm text-white/80">
           {data.pelada.hora ? data.pelada.hora.slice(0, 5) : 'horário a definir'}
-          {data.pelada.local ? ` · ${data.pelada.local}` : ''} · {confirmados.length} na lista
+          {data.pelada.local ? ` · ${data.pelada.local}` : ''}
         </p>
       </div>
+
       {erro && <Aviso tipo="erro">{erro}</Aviso>}
 
+      <div className="grid grid-cols-3 gap-2.5">
+        <StatTile valor={confirmados.length} rotulo="na lista" />
+        <StatTile valor={pagos} rotulo="pagos" />
+        <StatTile valor={data.presencas.filter((p) => p.status === 'desistiu').length} rotulo="fora" />
+      </div>
+
       {data.pelada.status === 'aberta' ? (
-        <div className="flex gap-2">
-          {data.minhaPresenca && data.minhaPresenca.status !== 'desistiu' ? (
-            <Button variante="secundario" className="flex-1" onClick={() => sairDaLista.mutate()}>
-              Sair da lista
-            </Button>
-          ) : (
-            <Button className="flex-1" onClick={() => confirmar.mutate('confirmado')} disabled={confirmar.isPending}>
-              {confirmar.isPending ? <Spinner /> : 'Confirmar presença'}
-            </Button>
-          )}
-        </div>
+        dentro ? (
+          <Button variante="secundario" onClick={() => sairDaLista.mutate()}>
+            Sair da lista
+          </Button>
+        ) : (
+          <Button onClick={() => confirmar.mutate('confirmado')} disabled={confirmar.isPending}>
+            {confirmar.isPending ? <Spinner /> : 'Confirmar presença'}
+          </Button>
+        )
       ) : (
         <Aviso>A lista desta pelada está {data.pelada.status}.</Aviso>
       )}
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-black/45">Lista de presença</h2>
-        <div className="flex flex-col gap-1.5">
+        <Eyebrow>Lista de presença</Eyebrow>
+        <div className="divide-y divide-tinta-line/60 overflow-hidden rounded-2xl border border-tinta-line/70 bg-gramado-raised">
           {data.presencas.map((p) => (
-            <div key={p.profileId} className="flex items-center gap-3 rounded-xl bg-white px-3 py-2">
-              <Avatar src={p.fotoUrl} nome={p.nome} size={32} />
-              <span className="flex-1 truncate text-sm font-medium">{p.nome ?? 'Jogador'}</span>
-              {p.estrelas != null && <Estrelas n={p.estrelas} className="text-xs" />}
-              <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${CORES[p.status]}`}>
-                {p.status}
+            <div
+              key={p.profileId}
+              className={`flex items-center gap-3 px-3.5 py-2.5 ${p.status === 'desistiu' ? 'opacity-55' : ''}`}
+            >
+              <Avatar src={p.fotoUrl} nome={p.nome} size={34} />
+              <span className={`flex-1 truncate text-sm font-medium ${p.status === 'desistiu' ? 'line-through' : ''}`}>
+                {p.nome ?? 'Jogador'}
               </span>
+              {p.estrelas != null && <Estrelas n={p.estrelas} />}
+              <Chip tom={p.status}>{p.status}</Chip>
             </div>
           ))}
-          {data.presencas.length === 0 && <p className="text-sm text-black/45">Ninguém confirmou ainda.</p>}
+          {data.presencas.length === 0 && (
+            <p className="px-3.5 py-6 text-center text-sm text-tinta-faint">Ninguém confirmou ainda.</p>
+          )}
         </div>
       </section>
 
@@ -125,7 +140,6 @@ function PainelSorteio({ peladaId, confirmados }: { peladaId: string; confirmado
     queryKey: ['sorteio', peladaId],
     queryFn: () => api<{ times: TimeResultado[] }>(`/peladas/${peladaId}/sorteio`),
   });
-
   const sortear = useMutation({
     mutationFn: () =>
       api<{ times: TimeResultado[]; amplitudeEstrelas: number }>(`/peladas/${peladaId}/sorteio`, {
@@ -142,20 +156,20 @@ function PainelSorteio({ peladaId, confirmados }: { peladaId: string; confirmado
   const times = sortear.data?.times ?? atual.data?.times ?? [];
 
   return (
-    <Card>
-      <h2 className="font-semibold">Sorteio de times</h2>
-      <p className="text-sm text-black/55">{confirmados} confirmado(s) para dividir.</p>
+    <Card as="section">
+      <Eyebrow>Sorteio de times</Eyebrow>
+      <p className="-mt-1 text-sm text-tinta-soft">{confirmados} confirmado(s) para dividir.</p>
       {erro && <div className="mt-2"><Aviso tipo="erro">{erro}</Aviso></div>}
 
-      <div className="mt-3 flex items-center gap-2">
-        <label className="text-sm">Times:</label>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="font-display text-sm font-semibold uppercase tracking-[0.03em] text-tinta-soft">Times</span>
         <input
           type="number"
           min={2}
           max={32}
           value={nTimes}
           onChange={(e) => setNTimes(Math.max(2, Math.min(32, Number(e.target.value))))}
-          className="w-16 rounded-lg border border-black/10 px-2 py-1 text-sm"
+          className="w-16 rounded-lg border border-tinta-line bg-white px-2 py-1.5 text-center placar-num text-base"
         />
         <Button onClick={() => sortear.mutate()} disabled={sortear.isPending}>
           {sortear.isPending ? <Spinner /> : times.length ? 'Re-sortear' : 'Sortear'}
@@ -163,23 +177,23 @@ function PainelSorteio({ peladaId, confirmados }: { peladaId: string; confirmado
       </div>
 
       {sortear.data && (
-        <p className="mt-2 text-xs text-black/50">
-          Diferença de estrelas entre o time mais forte e o mais fraco: {sortear.data.amplitudeEstrelas}
+        <p className="mt-2 text-xs text-tinta-faint">
+          Diferença entre o time mais forte e o mais fraco: {sortear.data.amplitudeEstrelas} estrela(s).
         </p>
       )}
 
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+      <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
         {times.map((t) => (
-          <div key={t.numero} className="rounded-xl border border-black/5 p-3">
-            <div className="mb-1 flex items-center justify-between">
-              <span className="font-semibold">Time {t.numero}</span>
-              <Estrelas n={t.totalEstrelas / Math.max(1, t.jogadores.length)} className="text-xs" />
+          <div key={t.numero} className="overflow-hidden rounded-xl border border-tinta-line/70">
+            <div className="flex items-center justify-between bg-gramado-dark px-3 py-2 text-white">
+              <span className="font-display text-sm font-bold uppercase tracking-[0.05em]">Time {t.numero}</span>
+              <Estrelas n={t.totalEstrelas / Math.max(1, t.jogadores.length)} />
             </div>
-            <ul className="text-sm text-black/70">
+            <ul className="divide-y divide-tinta-line/50 bg-gramado-raised text-sm">
               {t.jogadores.map((j) => (
-                <li key={j.profileId} className="flex justify-between">
-                  <span className="truncate">{j.nome ?? 'Jogador'}</span>
-                  <span className="text-amber-500">{'★'.repeat(j.estrelas)}</span>
+                <li key={j.profileId} className="flex items-center justify-between px-3 py-1.5">
+                  <span className="truncate text-tinta">{j.nome ?? 'Jogador'}</span>
+                  <Estrelas n={j.estrelas} />
                 </li>
               ))}
             </ul>

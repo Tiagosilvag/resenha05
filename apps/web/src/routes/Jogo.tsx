@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { TIPOS_EVENTO } from '@resenha05/shared';
 import { api, ApiError } from '../lib/api';
-import { Aviso, Button, Card, Input, Select, Spinner } from '../components/ui';
+import { Aviso, Button, Card, Eyebrow, Input, Select, Spinner } from '../components/ui';
 
 interface Evento {
   id: string;
@@ -65,14 +65,12 @@ export function Jogo() {
     onSuccess: () => { setErro(null); qc.invalidateQueries({ queryKey: ['jogo', jogoId] }); },
     onError: (e) => setErro(e instanceof ApiError ? e.message : 'Erro ao salvar o placar.'),
   });
-
   const addEvento = useMutation({
     mutationFn: (v: { profileId: string; tipo: string; minuto?: number }) =>
       api(`/jogos/${jogoId}/eventos`, { method: 'POST', json: v }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['jogo', jogoId] }),
     onError: (e) => setErro(e instanceof ApiError ? e.message : 'Erro ao registrar o evento.'),
   });
-
   const removerEvento = useMutation({
     mutationFn: (id: string) => api(`/jogos/${jogoId}/eventos/${id}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['jogo', jogoId] }),
@@ -84,44 +82,56 @@ export function Jogo() {
   const nomeB = j.time_b_nome ?? 'Time B';
 
   return (
-    <div className="flex flex-col gap-4">
-      {j.torneio_id && <Link to={`/torneios/${j.torneio_id}`} className="text-sm text-black/45">← Torneio</Link>}
+    <div className="flex flex-col gap-5">
+      {j.torneio_id && (
+        <Link to={`/torneios/${j.torneio_id}`} className="font-display text-xs font-semibold uppercase tracking-[0.05em] text-tinta-faint">
+          ← Torneio
+        </Link>
+      )}
       {erro && <Aviso tipo="erro">{erro}</Aviso>}
 
-      <Card>
-        <div className="flex items-center justify-center gap-4 text-lg font-bold">
-          <span>{nomeA}</span>
-          <span className="text-2xl text-campo-700">{j.placar_a ?? '–'} : {j.placar_b ?? '–'}</span>
-          <span>{nomeB}</span>
+      {/* placar */}
+      <div className="rounded-2xl bg-gramado-dark p-5 text-white shadow-scoreboard">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center">
+          <span className="font-display text-sm font-semibold uppercase tracking-[0.04em] text-white/80">{nomeA}</span>
+          <span className="placar-num text-4xl text-ouro-300">
+            {j.placar_a ?? '–'}<span className="mx-1.5 text-lg text-white/30">:</span>{j.placar_b ?? '–'}
+          </span>
+          <span className="font-display text-sm font-semibold uppercase tracking-[0.04em] text-white/80">{nomeB}</span>
         </div>
         {admin && (
-          <div className="mt-3 flex items-end justify-center gap-2">
-            <Input className="w-16 text-center" inputMode="numeric" placeholder={String(j.placar_a ?? 0)} value={placarA} onChange={(e) => setPlacarA(e.target.value)} />
-            <span className="pb-2">x</span>
-            <Input className="w-16 text-center" inputMode="numeric" placeholder={String(j.placar_b ?? 0)} value={placarB} onChange={(e) => setPlacarB(e.target.value)} />
+          <div className="mt-4 flex items-end justify-center gap-2">
+            <Input className="w-14 text-center placar-num" inputMode="numeric" placeholder={String(j.placar_a ?? 0)} value={placarA} onChange={(e) => setPlacarA(e.target.value)} />
+            <span className="pb-2 text-white/40">×</span>
+            <Input className="w-14 text-center placar-num" inputMode="numeric" placeholder={String(j.placar_b ?? 0)} value={placarB} onChange={(e) => setPlacarB(e.target.value)} />
             <Button onClick={() => salvarPlacar.mutate()} disabled={salvarPlacar.isPending}>
               {salvarPlacar.isPending ? <Spinner /> : 'Salvar'}
             </Button>
           </div>
         )}
-      </Card>
+      </div>
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-black/45">Súmula</h2>
+        <Eyebrow>Súmula</Eyebrow>
         {admin && membros && <NovoEvento membros={membros} onAdd={(v) => addEvento.mutate(v)} pendente={addEvento.isPending} />}
-        <div className="mt-2 flex flex-col gap-1.5">
+        <div className="mt-2 divide-y divide-tinta-line/60 overflow-hidden rounded-2xl border border-tinta-line/70 bg-gramado-raised">
           {data.eventos.map((ev) => (
-            <div key={ev.id} className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm">
-              {ev.minuto != null && <span className="w-8 text-black/40">{ev.minuto}'</span>}
-              <span className="flex-1">{ROTULO_EVENTO[ev.tipo] ?? ev.tipo} — {ev.nome ?? 'Jogador'}</span>
+            <div key={ev.id} className="flex items-center gap-3 px-3.5 py-2.5 text-sm">
+              <span className="placar-num w-9 text-tinta-faint">{ev.minuto != null ? `${ev.minuto}'` : '—'}</span>
+              <span className="flex-1">{ROTULO_EVENTO[ev.tipo] ?? ev.tipo} — <span className="font-medium">{ev.nome ?? 'Jogador'}</span></span>
               {admin && (
-                <button className="text-xs text-red-500" onClick={() => removerEvento.mutate(ev.id)}>
+                <button
+                  className="font-display text-[0.68rem] font-semibold uppercase tracking-[0.04em] text-barro-500"
+                  onClick={() => removerEvento.mutate(ev.id)}
+                >
                   remover
                 </button>
               )}
             </div>
           ))}
-          {data.eventos.length === 0 && <p className="text-sm text-black/45">Nenhum lance registrado.</p>}
+          {data.eventos.length === 0 && (
+            <p className="px-3.5 py-6 text-center text-sm text-tinta-faint">Nenhum lance registrado.</p>
+          )}
         </div>
       </section>
     </div>

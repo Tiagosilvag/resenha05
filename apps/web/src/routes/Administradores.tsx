@@ -60,8 +60,8 @@ export function Administradores() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-xl font-extrabold tracking-tight">Administradores</h1>
-        <p className="text-sm text-black/55">
+        <h1 className="font-display text-2xl font-bold tracking-tight">Administradores</h1>
+        <p className="text-sm text-tinta-soft">
           {totalAdmins}/5 admins. {souDono ? 'Você é o admin principal.' : 'Só o admin principal promove.'}
         </p>
       </div>
@@ -76,7 +76,7 @@ export function Administradores() {
               <Avatar src={m.fotoUrl} nome={m.nome} />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold">{m.nome ?? 'Sem nome'}</p>
-                <p className="text-xs text-black/50">{formatarTelefone(m.telefone)}</p>
+                <p className="text-xs text-tinta-faint">{formatarTelefone(m.telefone)}</p>
               </div>
               <span className="rounded-md bg-campo-50 px-2 py-0.5 text-xs font-semibold capitalize text-campo-700">
                 {m.papel.replace('_', ' ')}
@@ -119,7 +119,7 @@ export function Administradores() {
       {souDono && (
         <Card>
           <button
-            className="w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"
+            className="w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-barro-600 hover:bg-barro-100/50"
             onClick={async () => {
               if (!confirm('Encerrar esta organização? Peladas, torneios e vínculos serão apagados.')) return;
               try {

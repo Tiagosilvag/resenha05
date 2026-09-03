@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { LinhaClassificacao } from '@resenha05/shared';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { Aviso, Button, Card, Field, Select, Spinner } from '../components/ui';
+import { Aviso, Button, Card, Chip, Eyebrow, Field, Placar, Select, Spinner } from '../components/ui';
 
 interface Time { id: string; nome: string; grupo: string | null }
 interface Jogo {
@@ -24,6 +24,12 @@ interface TorneioResp {
   jogos: Jogo[];
   classificacao: LinhaClassificacao[];
 }
+
+const ROTULO_FORMATO: Record<string, string> = {
+  grupos: 'Fase de grupos',
+  mata_mata: 'Mata-mata',
+  pontos_corridos: 'Pontos corridos',
+};
 
 export function Torneio() {
   const { torneioId = '' } = useParams();
@@ -53,65 +59,89 @@ export function Torneio() {
   if (isLoading || !data) return <Spinner className="h-6 w-6 text-campo-600" />;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       <div>
-        <Link to="/torneios" className="text-sm text-black/45">← Torneios</Link>
-        <h1 className="text-xl font-extrabold tracking-tight">{data.torneio.nome}</h1>
+        <Link to="/torneios" className="font-display text-xs font-semibold uppercase tracking-[0.05em] text-tinta-faint">
+          ← Torneios
+        </Link>
+        <div className="mt-1 flex items-center gap-2">
+          <h1 className="font-display text-2xl font-bold tracking-tight">{data.torneio.nome}</h1>
+          <Chip tom={data.torneio.status === 'em_andamento' ? 'confirmado' : 'neutro'}>
+            {data.torneio.status.replace('_', ' ')}
+          </Chip>
+        </div>
+        <p className="text-sm text-tinta-faint">{ROTULO_FORMATO[data.torneio.formato] ?? data.torneio.formato}</p>
       </div>
       {erro && <Aviso tipo="erro">{erro}</Aviso>}
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-black/45">Classificação</h2>
-        <Card className="overflow-x-auto p-0">
+        <Eyebrow>Classificação</Eyebrow>
+        <div className="overflow-hidden rounded-2xl border border-tinta-line/70 bg-gramado-raised">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-black/5 text-left text-xs uppercase text-black/40">
-                <th className="px-3 py-2">Time</th>
-                <th className="px-2 py-2 text-center">P</th>
-                <th className="px-2 py-2 text-center">J</th>
-                <th className="px-2 py-2 text-center">SG</th>
+              <tr className="bg-gramado-sunk font-display text-[0.66rem] font-semibold uppercase tracking-[0.06em] text-tinta-faint">
+                <th className="py-2 pl-3 pr-1 text-left">#</th>
+                <th className="py-2 pr-2 text-left">Time</th>
+                <th className="px-1.5 py-2 text-center">P</th>
+                <th className="px-1.5 py-2 text-center">J</th>
+                <th className="px-1.5 py-2 text-center">SG</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-tinta-line/50">
               {data.classificacao.map((l, i) => (
-                <tr key={l.timeId ?? i} className="border-b border-black/5 last:border-0">
-                  <td className="px-3 py-2 font-medium">{i + 1}. {l.nome}</td>
-                  <td className="px-2 py-2 text-center font-bold text-campo-700">{l.pontos}</td>
-                  <td className="px-2 py-2 text-center">{l.jogos}</td>
-                  <td className="px-2 py-2 text-center">{l.saldo > 0 ? `+${l.saldo}` : l.saldo}</td>
+                <tr key={l.timeId ?? i} className={i === 0 ? 'bg-campo-50' : undefined}>
+                  <td className="py-2.5 pl-3 pr-1">
+                    <span
+                      className={`grid h-5 w-5 place-items-center rounded font-display text-xs font-bold ${
+                        i === 0 ? 'bg-campo-600 text-white' : 'bg-gramado-sunk text-tinta-soft'
+                      }`}
+                    >
+                      {i + 1}
+                    </span>
+                  </td>
+                  <td className="py-2.5 pr-2 font-medium">{l.nome}</td>
+                  <td className="placar-num px-1.5 py-2.5 text-center text-campo-700">{l.pontos}</td>
+                  <td className="px-1.5 py-2.5 text-center text-tinta-soft">{l.jogos}</td>
+                  <td className="px-1.5 py-2.5 text-center text-tinta-soft">
+                    {l.saldo > 0 ? `+${l.saldo}` : l.saldo}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </Card>
+        </div>
       </section>
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-black/45">Jogos</h2>
+        <Eyebrow>Jogos</Eyebrow>
         {admin && data.torneio.status === 'em_andamento' && (
           <NovoJogo times={data.times} onCriar={(v) => criarJogo.mutate(v)} pendente={criarJogo.isPending} />
         )}
         <div className="mt-2 flex flex-col gap-2">
           {data.jogos.map((j) => (
-            <Link key={j.id} to={`/jogos/${j.id}`}>
-              <Card>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">
-                    {j.fase && <span className="mr-2 text-xs text-black/40">{j.fase}</span>}
-                    {nomeTime(j, 'a')} <strong>{j.placar_a ?? '–'} x {j.placar_b ?? '–'}</strong> {nomeTime(j, 'b')}
-                  </span>
-                  <span className="text-xs uppercase text-black/40">{j.status.replace('_', ' ')}</span>
+            <Link key={j.id} to={`/jogos/${j.id}`} className="block">
+              <Card className="flex items-center gap-3 py-3 transition-shadow hover:shadow-pop">
+                <div className="min-w-0 flex-1">
+                  {j.fase && (
+                    <p className="font-display text-[0.62rem] font-semibold uppercase tracking-[0.08em] text-tinta-faint">
+                      {j.fase}
+                    </p>
+                  )}
+                  <p className="truncate text-sm font-medium">
+                    {nomeTime(j, 'a')} <span className="text-tinta-faint">vs</span> {nomeTime(j, 'b')}
+                  </p>
                 </div>
+                <Placar a={j.placar_a} b={j.placar_b} />
               </Card>
             </Link>
           ))}
-          {data.jogos.length === 0 && <p className="text-sm text-black/45">Nenhum jogo ainda.</p>}
+          {data.jogos.length === 0 && <p className="text-sm text-tinta-faint">Nenhum jogo ainda.</p>}
         </div>
       </section>
 
       {admin && data.torneio.status === 'em_andamento' && (
         <Button
-          variante="secundario"
+          variante="perigo"
           onClick={() =>
             api(`/torneios/${torneioId}/encerrar`, { method: 'POST' }).then(() =>
               qc.invalidateQueries({ queryKey: ['torneio', torneioId] }),

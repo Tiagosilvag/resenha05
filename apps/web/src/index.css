@@ -2,22 +2,95 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: light;
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    margin: 0;
+    background-color: theme('colors.gramado.bg');
+    background-image: theme('backgroundImage.gramada');
+    color: theme('colors.tinta.DEFAULT');
+    font-family: theme('fontFamily.sans');
+    font-size: 16px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: theme('fontFamily.display');
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    color: theme('colors.tinta.DEFAULT');
+  }
+
+  input,
+  select,
+  textarea,
+  button {
+    font-family: inherit;
+  }
+
+  /* Foco visível e consistente em tudo que é interativo. */
+  :focus-visible {
+    outline: 2px solid theme('colors.campo.600');
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background: theme('colors.campo.200');
+  }
 }
 
-body {
-  margin: 0;
-  background: #f4f7f3;
-  color: #14201a;
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  -webkit-font-smoothing: antialiased;
+@layer components {
+  /* Rótulo de seção — "eyebrow" em caixa alta, condensado. */
+  .eyebrow {
+    font-family: theme('fontFamily.display');
+    font-weight: 600;
+    font-size: 0.72rem;
+    letter-spacing: theme('letterSpacing.eyebrow');
+    text-transform: uppercase;
+    color: theme('colors.tinta.faint');
+  }
+
+  /* Linha de cal — divisória fina cor de giz. */
+  .linha-cal {
+    border-color: theme('colors.tinta.line');
+  }
+
+  /* Numerais de placar / estatística. */
+  .placar-num {
+    font-family: theme('fontFamily.display');
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+  }
 }
 
-/* Respeita a safe-area do iOS (notch / home indicator) — Fase 12. */
-.safe-top {
-  padding-top: env(safe-area-inset-top);
+@layer utilities {
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }
-.safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom);
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

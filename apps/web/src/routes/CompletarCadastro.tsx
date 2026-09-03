@@ -83,11 +83,14 @@ export function CompletarCadastro() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-xl font-extrabold tracking-tight">Complete seu cadastro</h1>
-        <p className="text-sm text-black/55">Tudo opcional. Nada aqui bloqueia o uso do app.</p>
+        <h1 className="font-display text-2xl font-bold tracking-tight">Complete seu cadastro</h1>
+        <p className="text-sm text-tinta-soft">Tudo opcional. Nada aqui bloqueia o uso do app.</p>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-campo-100">
-        <div className="h-full rounded-full bg-campo-600 transition-all" style={{ width: `${data.progresso}%` }} />
+      <div className="flex items-center gap-3">
+        <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-campo-100">
+          <div className="h-full rounded-full bg-campo-600 transition-[width] duration-500" style={{ width: `${data.progresso}%` }} />
+        </div>
+        <span className="placar-num text-sm text-campo-700">{data.progresso}%</span>
       </div>
       {msg && <Aviso tipo={msg.tipo}>{msg.texto}</Aviso>}
 
@@ -133,11 +136,11 @@ export function CompletarCadastro() {
         </div>
       </Card>
 
-      <Card>
-        <label className="flex items-start gap-3 text-sm">
+      <Card className="bg-campo-50">
+        <label className="flex items-start gap-3 text-sm text-tinta-soft">
           <input
             type="checkbox"
-            className="mt-0.5 h-4 w-4"
+            className="mt-0.5 h-4 w-4 accent-campo-600"
             checked={form.aceiteMarketing}
             onChange={(e) => set('aceiteMarketing', e.target.checked)}
           />

@@ -37,8 +37,8 @@ export function NovaOrganizacao() {
   return (
     <div className="mx-auto flex max-w-sm flex-col gap-4">
       <div>
-        <h1 className="text-xl font-extrabold tracking-tight">Criar organização</h1>
-        <p className="text-sm text-black/55">
+        <h1 className="font-display text-2xl font-bold tracking-tight">Criar organização</h1>
+        <p className="text-sm text-tinta-soft">
           Você vira o administrador principal. Depois configura as peladas e convida os jogadores.
         </p>
       </div>

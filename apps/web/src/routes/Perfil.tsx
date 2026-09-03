@@ -60,26 +60,34 @@ export function Perfil() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-extrabold tracking-tight">Meu perfil</h1>
+    <div className="flex flex-col gap-5">
+      <h1 className="font-display text-2xl font-bold tracking-tight">Meu perfil</h1>
       {msg && <Aviso tipo={msg.tipo}>{msg.texto}</Aviso>}
 
-      <Card>
-        <div className="flex items-center gap-4">
+      <Card className="flex items-center gap-4">
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="relative rounded-full transition-transform active:scale-95"
+        >
           <Avatar src={usuario?.fotoUrl} nome={usuario?.nome} size={64} />
-          <div>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="hidden"
-              onChange={(e) => e.target.files?.[0] && trocarFoto(e.target.files[0])}
-            />
-            <Button variante="secundario" onClick={() => fileRef.current?.click()}>
-              Trocar foto
-            </Button>
-          </div>
+          <span className="absolute -bottom-1 -right-1 grid h-6 w-6 place-items-center rounded-full bg-campo-600 text-white ring-2 ring-white">
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M4 7h3l2-2h6l2 2h3v12H4z" /><circle cx="12" cy="13" r="3.2" />
+            </svg>
+          </span>
+        </button>
+        <div>
+          <p className="font-display font-semibold uppercase tracking-[0.02em]">{usuario?.nome}</p>
+          <p className="text-sm text-tinta-faint">{formatarTelefone(usuario?.telefone ?? '')}</p>
         </div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={(e) => e.target.files?.[0] && trocarFoto(e.target.files[0])}
+        />
       </Card>
 
       <Card>
@@ -99,13 +107,13 @@ export function Perfil() {
         </div>
       </Card>
 
-      <Card>
+      <Card className="flex flex-col gap-1">
         <Button variante="fantasma" className="w-full" onClick={() => sair().then(() => nav('/entrar'))}>
           Sair da conta
         </Button>
         <button
           onClick={excluirConta}
-          className="mt-2 w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"
+          className="w-full rounded-xl px-4 py-2.5 font-display text-sm font-semibold uppercase tracking-[0.03em] text-barro-600 hover:bg-barro-100/50"
         >
           Excluir conta e dados (LGPD)
         </button>

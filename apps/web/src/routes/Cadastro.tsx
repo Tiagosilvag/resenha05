@@ -60,11 +60,11 @@ export function Cadastro() {
         const fotoUrl = await enviarFoto(foto);
         await api('/perfil', { method: 'PATCH', json: { fotoUrl } });
       } catch (e) {
-        if (e instanceof FotoIndisponivel) {
-          setAviso('Conta criada. O envio de foto ainda não está ativo — adicione no Perfil depois.');
-        } else {
-          setAviso('Conta criada, mas a foto não subiu. Tente de novo no Perfil.');
-        }
+        setAviso(
+          e instanceof FotoIndisponivel
+            ? 'Conta criada. O envio de foto ainda não está ativo — adicione no Perfil depois.'
+            : 'Conta criada, mas a foto não subiu. Tente de novo no Perfil.',
+        );
       }
       await recarregar();
       nav('/', { replace: true });
@@ -75,19 +75,37 @@ export function Cadastro() {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-6 py-10">
-      <div className="flex flex-col items-center gap-2 text-center">
-        <Logo size={48} />
-        <h1 className="text-xl font-extrabold tracking-tight">Criar cadastro</h1>
-      </div>
+    <div className="flex min-h-screen flex-col">
+      <header className="safe-top flex flex-col items-center bg-campo-700 bg-gramada px-6 pb-14 pt-12 text-center text-white">
+        <Logo size={46} aro />
+        <h1 className="mt-3 font-display text-2xl font-bold uppercase tracking-tight text-white">Criar cadastro</h1>
+      </header>
 
-      <form onSubmit={onSubmit} className="flex flex-col gap-4">
-        {erro && <Aviso tipo="erro">{erro}</Aviso>}
-        {aviso && <Aviso tipo="ok">{aviso}</Aviso>}
+      <div className="mx-auto -mt-9 w-full max-w-sm flex-1 px-6 pb-10">
+        <form
+          onSubmit={onSubmit}
+          className="animate-fade-up flex flex-col gap-4 rounded-2xl border border-tinta-line/60 bg-gramado-raised p-6 shadow-pop"
+        >
+          {erro && <Aviso tipo="erro">{erro}</Aviso>}
+          {aviso && <Aviso tipo="ok">{aviso}</Aviso>}
 
-        <div className="flex items-center gap-4">
-          <Avatar src={previa} nome={nome} size={64} />
-          <div>
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="relative rounded-full transition-transform active:scale-95"
+            >
+              <Avatar src={previa} nome={nome} size={68} />
+              <span className="absolute -bottom-1 -right-1 grid h-6 w-6 place-items-center rounded-full bg-campo-600 text-white ring-2 ring-white">
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </span>
+            </button>
+            <div className="text-sm">
+              <p className="font-semibold text-tinta">Foto de perfil</p>
+              <p className="text-xs text-tinta-faint">Obrigatória. JPEG, PNG ou WebP.</p>
+            </div>
             <input
               ref={fileRef}
               type="file"
@@ -96,49 +114,45 @@ export function Cadastro() {
               className="hidden"
               onChange={(e) => escolherFoto(e.target.files?.[0] ?? null)}
             />
-            <Button type="button" variante="secundario" onClick={() => fileRef.current?.click()}>
-              {foto ? 'Trocar foto' : 'Adicionar foto'}
-            </Button>
-            <p className="mt-1 text-xs text-black/50">Obrigatória. JPEG, PNG ou WebP.</p>
           </div>
-        </div>
 
-        <Field label="Nome">
-          <Input value={nome} onChange={(e) => setNome(e.target.value)} required />
-        </Field>
-        <Field label="Telefone (WhatsApp)" dica="Só um número por pessoa.">
-          <Input
-            inputMode="tel"
-            placeholder="(11) 91234-5678"
-            value={telefone}
-            onChange={(e) => setTelefone(e.target.value)}
-            onBlur={() => telefone && setTelefone(formatarTelefone(normalizarTelefone(telefone)))}
-            required
-          />
-        </Field>
-        <Field label="Senha" dica="Mínimo 8 caracteres.">
-          <Input type="password" autoComplete="new-password" value={senha} onChange={(e) => setSenha(e.target.value)} required />
-        </Field>
-        <Field label="Time do coração (opcional)">
-          <Input list="times" value={timeCoracao} onChange={(e) => setTimeCoracao(e.target.value)} placeholder="Ex.: Flamengo" />
-          <datalist id="times">
-            {TIMES.map((t) => (
-              <option key={t} value={t} />
-            ))}
-          </datalist>
-        </Field>
+          <Field label="Nome">
+            <Input value={nome} onChange={(e) => setNome(e.target.value)} required />
+          </Field>
+          <Field label="Telefone (WhatsApp)" dica="Só um número por pessoa.">
+            <Input
+              inputMode="tel"
+              placeholder="(11) 91234-5678"
+              value={telefone}
+              onChange={(e) => setTelefone(e.target.value)}
+              onBlur={() => telefone && setTelefone(formatarTelefone(normalizarTelefone(telefone)))}
+              required
+            />
+          </Field>
+          <Field label="Senha" dica="Mínimo 8 caracteres.">
+            <Input type="password" autoComplete="new-password" value={senha} onChange={(e) => setSenha(e.target.value)} required />
+          </Field>
+          <Field label="Time do coração (opcional)">
+            <Input list="times" value={timeCoracao} onChange={(e) => setTimeCoracao(e.target.value)} placeholder="Ex.: Flamengo" />
+            <datalist id="times">
+              {TIMES.map((t) => (
+                <option key={t} value={t} />
+              ))}
+            </datalist>
+          </Field>
 
-        <Button type="submit" disabled={enviando}>
-          {enviando ? <Spinner /> : 'Concluir cadastro'}
-        </Button>
-      </form>
+          <Button type="submit" disabled={enviando} className="mt-1">
+            {enviando ? <Spinner /> : 'Concluir cadastro'}
+          </Button>
+        </form>
 
-      <p className="text-center text-sm text-black/55">
-        Já tem conta?{' '}
-        <Link to="/entrar" className="font-semibold text-campo-700">
-          Entrar
-        </Link>
-      </p>
+        <p className="mt-6 text-center text-sm text-tinta-soft">
+          Já tem conta?{' '}
+          <Link to="/entrar" className="font-display font-semibold uppercase tracking-[0.03em] text-campo-700">
+            Entrar
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }

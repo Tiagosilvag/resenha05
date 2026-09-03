@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { criarTorneioSchema, FORMATOS_TORNEIO } from '@resenha05/shared';
 import { api, ApiError } from '../lib/api';
 import { useOrg } from '../lib/org';
-import { Aviso, Button, Card, Field, Input, Select, Spinner } from '../components/ui';
+import { Aviso, Button, Card, Chip, Field, Input, Select, Spinner, Textarea } from '../components/ui';
 
 interface Torneio {
   id: string;
@@ -32,19 +32,30 @@ export function Torneios() {
   });
 
   if (!orgId) {
-    return <Card><p className="text-sm text-black/55">Você não participa de nenhuma organização.</p></Card>;
+    return <Card><p className="text-sm text-tinta-soft">Você não participa de nenhuma organização.</p></Card>;
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-extrabold tracking-tight">Torneios e copas</h1>
-        <Link to="/artilharia" className="text-sm font-semibold text-campo-700">Artilharia →</Link>
+    <div className="flex flex-col gap-5">
+      <div className="flex items-baseline justify-between gap-3">
+        <h1 className="font-display text-2xl font-bold tracking-tight">Torneios e copas</h1>
+        <Link
+          to="/artilharia"
+          className="font-display text-xs font-semibold uppercase tracking-[0.05em] text-campo-700"
+        >
+          Artilharia →
+        </Link>
       </div>
 
       {admin && (
-        <button className="self-start text-sm font-semibold text-campo-700" onClick={() => setNovo((v) => !v)}>
-          {novo ? 'Fechar' : '+ Novo torneio'}
+        <button
+          className="inline-flex items-center gap-1.5 self-start font-display text-sm font-semibold uppercase tracking-[0.04em] text-campo-700"
+          onClick={() => setNovo((v) => !v)}
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+            <path d={novo ? 'M6 6l12 12M6 18 18 6' : 'M12 5v14M5 12h14'} />
+          </svg>
+          {novo ? 'Fechar' : 'Novo torneio'}
         </button>
       )}
       {admin && novo && <NovoTorneio orgId={orgId} onCriado={() => { setNovo(false); qc.invalidateQueries({ queryKey: ['torneios', orgId] }); }} />}
@@ -54,19 +65,17 @@ export function Torneios() {
       ) : (
         <div className="flex flex-col gap-2">
           {data?.map((t) => (
-            <Link key={t.id} to={`/torneios/${t.id}`}>
-              <Card>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold">{t.nome}</p>
-                    <p className="text-xs text-black/50">{ROTULO_FORMATO[t.formato] ?? t.formato}</p>
-                  </div>
-                  <span className="text-xs font-semibold uppercase text-campo-700">{t.status.replace('_', ' ')}</span>
+            <Link key={t.id} to={`/torneios/${t.id}`} className="block">
+              <Card className="flex items-center justify-between gap-3 py-3 transition-shadow hover:shadow-pop">
+                <div className="min-w-0">
+                  <p className="truncate font-display font-semibold uppercase tracking-[0.02em]">{t.nome}</p>
+                  <p className="text-xs text-tinta-faint">{ROTULO_FORMATO[t.formato] ?? t.formato}</p>
                 </div>
+                <Chip tom={t.status === 'em_andamento' ? 'confirmado' : 'neutro'}>{t.status.replace('_', ' ')}</Chip>
               </Card>
             </Link>
           ))}
-          {data?.length === 0 && <p className="text-sm text-black/45">Nenhum torneio ainda.</p>}
+          {data?.length === 0 && <p className="text-sm text-tinta-faint">Nenhum torneio ainda.</p>}
         </div>
       )}
     </div>
@@ -108,8 +117,7 @@ function NovoTorneio({ orgId, onCriado }: { orgId: string; onCriado: () => void 
           </Select>
         </Field>
         <Field label="Times (um por linha)">
-          <textarea
-            className="w-full rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-campo-400 focus:ring-2 focus:ring-campo-100"
+          <Textarea
             rows={5}
             value={timesTexto}
             onChange={(e) => setTimesTexto(e.target.value)}
