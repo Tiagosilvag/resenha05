@@ -69,7 +69,7 @@ export function Pelada() {
         <p className="font-display text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-white/70">
           Próxima pelada
         </p>
-        <h1 className="mt-1 font-display text-2xl font-bold capitalize tracking-tight text-white">{dataFmt}</h1>
+        <h1 className="mt-1 font-display text-2xl font-bold tracking-tight text-white first-letter:uppercase">{dataFmt}</h1>
         <p className="mt-0.5 text-sm text-white/80">
           {data.pelada.hora ? data.pelada.hora.slice(0, 5) : 'horário a definir'}
           {data.pelada.local ? ` · ${data.pelada.local}` : ''}

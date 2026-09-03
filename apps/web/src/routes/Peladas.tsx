@@ -130,7 +130,7 @@ export function Peladas() {
                   </span>
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium capitalize">
+                  <p className="font-medium first-letter:uppercase">
                     {new Date(p.data.slice(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long' })}
                     {p.hora ? ` · ${p.hora.slice(0, 5)}` : ''}
                   </p>
