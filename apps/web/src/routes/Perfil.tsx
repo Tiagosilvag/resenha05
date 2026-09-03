@@ -2,12 +2,15 @@ import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatarTelefone } from '@resenha05/shared';
 import { useAuth } from '../lib/auth';
+import { useOrg } from '../lib/org';
 import { api, ApiError } from '../lib/api';
 import { enviarFoto } from '../lib/foto';
-import { Avatar, Aviso, Button, Card, Field, Input, Spinner } from '../components/ui';
+import { Avatar, Aviso, Button, Card, Eyebrow, Field, Input, Spinner } from '../components/ui';
+import { Cartinha } from '../components/Cartinha';
 
 export function Perfil() {
   const { usuario, recarregar, sair } = useAuth();
+  const { orgId } = useOrg();
   const nav = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -85,6 +88,13 @@ export function Perfil() {
           onChange={(e) => e.target.files?.[0] && trocarFoto(e.target.files[0])}
         />
       </Card>
+
+      {usuario && orgId && (
+        <section>
+          <Eyebrow>Minha cartinha</Eyebrow>
+          <Cartinha profileId={usuario.id} orgId={orgId} nome={usuario.nome} baixavel />
+        </section>
+      )}
 
       <Card>
         <div className="flex flex-col gap-4">

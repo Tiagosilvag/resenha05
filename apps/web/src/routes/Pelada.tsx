@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../lib/auth';
 import { api, ApiError } from '../lib/api';
 import { Avatar, Aviso, Button, Card, Chip, Estrelas, Eyebrow, Spinner, StatTile } from '../components/ui';
+import { CartinhaModal } from '../components/Cartinha';
 
 interface Presenca {
   profileId: string;
@@ -30,6 +31,7 @@ export function Pelada() {
   const { usuario } = useAuth();
   const qc = useQueryClient();
   const [erro, setErro] = useState<string | null>(null);
+  const [verCard, setVerCard] = useState<{ id: string; nome: string | null } | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['pelada', peladaId],
@@ -107,13 +109,19 @@ export function Pelada() {
               className={`flex items-center gap-3 px-3.5 py-2.5 ${p.status === 'desistiu' ? 'opacity-55' : ''}`}
             >
               <span className="placar-num w-5 shrink-0 text-center text-xs text-tinta-faint">{i + 1}</span>
-              <Avatar src={p.fotoUrl} nome={p.nome} size={34} />
-              <div className="min-w-0 flex-1">
-                <p className={`truncate text-sm font-medium ${p.status === 'desistiu' ? 'line-through' : ''}`}>
-                  {p.nome ?? 'Jogador'}
-                </p>
-                {p.estrelas != null && <Estrelas n={p.estrelas} className="mt-0.5" />}
-              </div>
+              <button
+                type="button"
+                className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                onClick={() => setVerCard({ id: p.profileId, nome: p.nome })}
+              >
+                <Avatar src={p.fotoUrl} nome={p.nome} size={34} />
+                <span className="min-w-0">
+                  <span className={`block truncate text-sm font-medium ${p.status === 'desistiu' ? 'line-through' : ''}`}>
+                    {p.nome ?? 'Jogador'}
+                  </span>
+                  {p.estrelas != null && <Estrelas n={p.estrelas} className="mt-0.5" />}
+                </span>
+              </button>
               <Chip tom={p.status}>{p.status}</Chip>
             </div>
           ))}
@@ -123,7 +131,22 @@ export function Pelada() {
         </div>
       </section>
 
-      {admin && <PainelSorteio peladaId={peladaId} confirmados={confirmados.length} />}
+      {admin && (
+        <PainelSorteio
+          peladaId={peladaId}
+          orgId={data.pelada.organizacao_id}
+          confirmados={confirmados.length}
+        />
+      )}
+
+      {verCard && (
+        <CartinhaModal
+          profileId={verCard.id}
+          orgId={data.pelada.organizacao_id}
+          nome={verCard.nome}
+          onFechar={() => setVerCard(null)}
+        />
+      )}
     </div>
   );
 }
@@ -134,10 +157,19 @@ interface TimeResultado {
   jogadores: { profileId: string; nome: string | null; estrelas: number }[];
 }
 
-function PainelSorteio({ peladaId, confirmados }: { peladaId: string; confirmados: number }) {
+function PainelSorteio({
+  peladaId,
+  orgId,
+  confirmados,
+}: {
+  peladaId: string;
+  orgId: string;
+  confirmados: number;
+}) {
   const qc = useQueryClient();
   const [nTimes, setNTimes] = useState(2);
   const [erro, setErro] = useState<string | null>(null);
+  const [verCard, setVerCard] = useState<{ id: string; nome: string | null } | null>(null);
 
   const atual = useQuery({
     queryKey: ['sorteio', peladaId],
@@ -195,7 +227,13 @@ function PainelSorteio({ peladaId, confirmados }: { peladaId: string; confirmado
             <ul className="divide-y divide-tinta-line/50 bg-gramado-raised text-sm">
               {t.jogadores.map((j) => (
                 <li key={j.profileId} className="flex items-center justify-between px-3 py-1.5">
-                  <span className="truncate text-tinta">{j.nome ?? 'Jogador'}</span>
+                  <button
+                    type="button"
+                    className="truncate text-left text-tinta underline-offset-2 hover:underline"
+                    onClick={() => setVerCard({ id: j.profileId, nome: j.nome })}
+                  >
+                    {j.nome ?? 'Jogador'}
+                  </button>
                   <Estrelas n={j.estrelas} />
                 </li>
               ))}
@@ -203,6 +241,15 @@ function PainelSorteio({ peladaId, confirmados }: { peladaId: string; confirmado
           </div>
         ))}
       </div>
+
+      {verCard && (
+        <CartinhaModal
+          profileId={verCard.id}
+          orgId={orgId}
+          nome={verCard.nome}
+          onFechar={() => setVerCard(null)}
+        />
+      )}
     </Card>
   );
 }

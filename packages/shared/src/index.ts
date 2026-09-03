@@ -6,6 +6,7 @@ export * from './schemas/organizacao.js';
 export * from './schemas/pelada.js';
 export * from './schemas/torneio.js';
 export * from './classificacao.js';
+export * from './cartinha.js';
 
 /** Formato do usuário logado devolvido pela API em /auth/* e /perfil. */
 export interface SessaoUsuario {
