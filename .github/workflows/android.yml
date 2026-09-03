@@ -1,0 +1,46 @@
+name: Android (AAB)
+
+# Manual — precisa dos secrets de assinatura configurados e da pasta
+# apps/web/android/ commitada (gerada por `npx cap add android`).
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - run: npm ci
+      - run: npm run build --workspace @resenha05/shared
+      - run: npm run build --workspace @resenha05/web
+      - run: npx --workspace @resenha05/web cap sync android
+
+      - name: Restaura a keystore
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > apps/web/android/app/upload.keystore
+
+      - name: Build AAB assinado
+        working-directory: apps/web/android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          ./gradlew bundleRelease \
+            -Pandroid.injected.signing.store.file=upload.keystore \
+            -Pandroid.injected.signing.store.password="$ANDROID_KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$ANDROID_KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$ANDROID_KEY_PASSWORD"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: resenha05-release-aab
+          path: apps/web/android/app/build/outputs/bundle/release/*.aab

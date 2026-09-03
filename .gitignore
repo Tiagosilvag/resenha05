@@ -13,3 +13,12 @@ npm-debug.log*
 apps/web/dist/
 apps/api/dist/
 packages/*/dist/
+
+# Capacitor — as pastas android/ e ios/ (geradas por `npx cap add`) SÃO
+# commitadas (convenção do Capacitor); só os builds delas ficam de fora.
+apps/web/android/app/build/
+apps/web/android/.gradle/
+apps/web/android/app/upload.keystore
+apps/web/ios/App/Pods/
+apps/web/ios/App/build/
+apps/web/.capacitor/
