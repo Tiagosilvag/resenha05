@@ -32,7 +32,7 @@ O front chama sempre `/api/*`; em dev o Vite faz proxy para `http://localhost:30
 
 ## Deploy (Coolify — um recurso só, Docker Compose)
 
-Build pack **Docker Compose**, arquivo `docker-compose.yml` na raiz. Sobe 3
+Build pack **Docker Compose**, arquivo `docker-compose.yaml` na raiz. Sobe 3
 containers (`db`, `api`, `web`) numa rede interna. O `web` (nginx) faz proxy de
 `/api` para o `api` — um domínio só, sem CORS.
 
