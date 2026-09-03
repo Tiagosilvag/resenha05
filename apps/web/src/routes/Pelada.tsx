@@ -55,7 +55,7 @@ export function Pelada() {
 
   const confirmados = data.presencas.filter((p) => p.status !== 'desistiu');
   const pagos = data.presencas.filter((p) => p.status === 'pago').length;
-  const dataFmt = new Date(data.pelada.data + 'T00:00:00').toLocaleDateString('pt-BR', {
+  const dataFmt = new Date(data.pelada.data.slice(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR', {
     weekday: 'long',
     day: '2-digit',
     month: 'long',
@@ -101,16 +101,19 @@ export function Pelada() {
       <section>
         <Eyebrow>Lista de presença</Eyebrow>
         <div className="divide-y divide-tinta-line/60 overflow-hidden rounded-2xl border border-tinta-line/70 bg-gramado-raised">
-          {data.presencas.map((p) => (
+          {data.presencas.map((p, i) => (
             <div
               key={p.profileId}
               className={`flex items-center gap-3 px-3.5 py-2.5 ${p.status === 'desistiu' ? 'opacity-55' : ''}`}
             >
+              <span className="placar-num w-5 shrink-0 text-center text-xs text-tinta-faint">{i + 1}</span>
               <Avatar src={p.fotoUrl} nome={p.nome} size={34} />
-              <span className={`flex-1 truncate text-sm font-medium ${p.status === 'desistiu' ? 'line-through' : ''}`}>
-                {p.nome ?? 'Jogador'}
-              </span>
-              {p.estrelas != null && <Estrelas n={p.estrelas} />}
+              <div className="min-w-0 flex-1">
+                <p className={`truncate text-sm font-medium ${p.status === 'desistiu' ? 'line-through' : ''}`}>
+                  {p.nome ?? 'Jogador'}
+                </p>
+                {p.estrelas != null && <Estrelas n={p.estrelas} className="mt-0.5" />}
+              </div>
               <Chip tom={p.status}>{p.status}</Chip>
             </div>
           ))}

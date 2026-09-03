@@ -148,7 +148,17 @@ export const rotasTorneios: FastifyPluginAsync = async (app) => {
     const { orgId } = await orgDoJogo(jogoId);
     const vinculo = exigirMembro(req, orgId);
     const [jogo, eventos] = await Promise.all([
-      db.selectFrom('jogos').selectAll().where('id', '=', jogoId).executeTakeFirstOrThrow(),
+      db
+        .selectFrom('jogos as j')
+        .leftJoin('torneio_times as ta', 'ta.id', 'j.time_a_id')
+        .leftJoin('torneio_times as tb', 'tb.id', 'j.time_b_id')
+        .selectAll('j')
+        .select((eb) => [
+          eb.fn.coalesce('ta.nome', 'j.time_a_nome').as('time_a_label'),
+          eb.fn.coalesce('tb.nome', 'j.time_b_nome').as('time_b_label'),
+        ])
+        .where('j.id', '=', jogoId)
+        .executeTakeFirstOrThrow(),
       db
         .selectFrom('sumula_eventos as se')
         .innerJoin('profiles as p', 'p.id', 'se.profile_id')

@@ -17,8 +17,8 @@ interface JogoResp {
     id: string;
     torneio_id: string | null;
     organizacaoId: string;
-    time_a_nome: string | null;
-    time_b_nome: string | null;
+    time_a_label: string | null;
+    time_b_label: string | null;
     placar_a: number | null;
     placar_b: number | null;
     status: string;
@@ -78,8 +78,8 @@ export function Jogo() {
 
   if (isLoading || !data) return <Spinner className="h-6 w-6 text-campo-600" />;
   const j = data.jogo;
-  const nomeA = j.time_a_nome ?? 'Time A';
-  const nomeB = j.time_b_nome ?? 'Time B';
+  const nomeA = j.time_a_label ?? 'Time A';
+  const nomeB = j.time_b_label ?? 'Time B';
 
   return (
     <div className="flex flex-col gap-5">

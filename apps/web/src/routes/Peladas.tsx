@@ -123,15 +123,15 @@ export function Peladas() {
               <Card className="flex items-center gap-3 py-3 transition-shadow hover:shadow-pop">
                 <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-campo-100 text-center">
                   <span className="placar-num text-base leading-none text-campo-700">
-                    {new Date(p.data + 'T00:00:00').getDate()}
+                    {new Date(p.data.slice(0, 10) + 'T12:00:00').getDate()}
                   </span>
                   <span className="font-display text-[0.55rem] font-semibold uppercase leading-none text-campo-600">
-                    {new Date(p.data + 'T00:00:00').toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')}
+                    {new Date(p.data.slice(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')}
                   </span>
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="font-medium capitalize">
-                    {new Date(p.data + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'long' })}
+                    {new Date(p.data.slice(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long' })}
                     {p.hora ? ` · ${p.hora.slice(0, 5)}` : ''}
                   </p>
                   <p className="text-xs text-tinta-faint">{p.local ?? 'Local a definir'}</p>
