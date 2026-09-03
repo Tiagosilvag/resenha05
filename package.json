@@ -1,0 +1,33 @@
+{
+  "name": "resenha05",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Resenha05 — gestão de peladas, copas e campeonatos",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm run build --workspace @resenha05/shared && npm run build --workspace @resenha05/api && npm run build --workspace @resenha05/web",
+    "dev:api": "npm run dev --workspace @resenha05/api",
+    "dev:web": "npm run dev --workspace @resenha05/web",
+    "db:migrate": "node db/migrate.mjs",
+    "db:bootstrap:build": "node db/build-bootstrap.mjs",
+    "lint": "eslint .",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.10",
+    "@typescript-eslint/eslint-plugin": "^8.18.0",
+    "@typescript-eslint/parser": "^8.18.0",
+    "eslint": "^9.17.0",
+    "typescript": "^5.7.2"
+  }
+}
