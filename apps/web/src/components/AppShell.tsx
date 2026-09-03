@@ -74,7 +74,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <span className="font-display text-base font-bold uppercase tracking-tight">Resenha05</span>
           <SeletorOrg className="ml-auto max-w-[46%]" />
         </header>
-        <div className="animate-fade-up px-4 py-5 md:px-9 md:py-9">{children}</div>
+        <div className="px-4 py-5 md:px-9 md:py-9">{children}</div>
       </main>
 
       {/* Bottom nav — mobile */}

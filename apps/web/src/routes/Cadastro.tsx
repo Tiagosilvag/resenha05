@@ -84,7 +84,7 @@ export function Cadastro() {
       <div className="mx-auto -mt-9 w-full max-w-sm flex-1 px-6 pb-10">
         <form
           onSubmit={onSubmit}
-          className="animate-fade-up flex flex-col gap-4 rounded-2xl border border-tinta-line/60 bg-gramado-raised p-6 shadow-pop"
+          className="flex flex-col gap-4 rounded-2xl border border-tinta-line/60 bg-gramado-raised p-6 shadow-pop"
         >
           {erro && <Aviso tipo="erro">{erro}</Aviso>}
           {aviso && <Aviso tipo="ok">{aviso}</Aviso>}

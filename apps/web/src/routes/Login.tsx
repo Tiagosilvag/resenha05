@@ -40,7 +40,7 @@ export function Login() {
       <div className="mx-auto -mt-10 w-full max-w-sm flex-1 px-6">
         <form
           onSubmit={onSubmit}
-          className="animate-fade-up flex flex-col gap-4 rounded-2xl border border-tinta-line/60 bg-gramado-raised p-6 shadow-pop"
+          className="flex flex-col gap-4 rounded-2xl border border-tinta-line/60 bg-gramado-raised p-6 shadow-pop"
         >
           {erro && <Aviso tipo="erro">{erro}</Aviso>}
           <Field label="Telefone (WhatsApp)">
