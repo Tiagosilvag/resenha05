@@ -22,23 +22,26 @@ services:
     environment:
       POSTGRES_DB: resenha05
       POSTGRES_USER: resenha05_app
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # OBRIGATÓRIO: defina POSTGRES_PASSWORD nas variáveis do Coolify.
+      # Sem valor, o Postgres não inicializa e o container fica unhealthy.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U resenha05_app -d resenha05']
+      test: ['CMD-SHELL', 'pg_isready -U resenha05_app -d resenha05 -q']
       interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 15
+      start_period: 45s
 
   api:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
     restart: unless-stopped
+    # Ordem de start apenas; migrate.mjs espera o banco aceitar conexão.
     depends_on:
-      db:
-        condition: service_healthy
+      - db
     environment:
       NODE_ENV: production
       PORT: 3000

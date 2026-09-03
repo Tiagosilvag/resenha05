@@ -26,7 +26,25 @@ if (!connectionString) {
 }
 
 const client = new pg.Client({ connectionString });
-await client.connect();
+
+// Espera o Postgres aceitar conexão (o container do banco pode subir logo
+// depois da API no docker-compose).
+{
+  const MAX = 20;
+  for (let tentativa = 1; ; tentativa++) {
+    try {
+      await client.connect();
+      break;
+    } catch (err) {
+      if (tentativa >= MAX) {
+        console.error(`Não conectou ao banco após ${MAX} tentativas: ${err.message}`);
+        process.exit(1);
+      }
+      process.stdout.write(`Banco indisponível (tentativa ${tentativa}/${MAX})...\n`);
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+  }
+}
 
 try {
   await client.query(`
