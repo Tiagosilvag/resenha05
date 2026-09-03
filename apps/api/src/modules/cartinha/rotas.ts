@@ -9,6 +9,8 @@ import { UPLOADS_DIR } from '../../lib/uploads.js';
 import { renderCartinhaPng, type DadosCartinha } from '../../lib/cartinha.js';
 
 const DIR_CARDS = join(UPLOADS_DIR, 'cards');
+// Suba quando o layout da cartinha mudar, para invalidar o cache do volume.
+const VERSAO_LAYOUT = 3;
 
 /** Descobre uma organização em comum entre quem pede e o alvo. */
 async function orgComum(req: FastifyRequest, alvo: string, preferida?: string): Promise<string> {
@@ -120,7 +122,7 @@ export const rotasCartinha: FastifyPluginAsync = async (app) => {
     const orgId = await orgComum(req, profileId, org);
     const dados = await montarDados(profileId, orgId);
     const chave = `${profileId}-${createHash('sha1')
-      .update(JSON.stringify([dados.fotoUrl, dados.fotoRecortada, dados.estrelas, dados.posicao, dados.pePreferido, dados.desempenho]))
+      .update(JSON.stringify([VERSAO_LAYOUT, dados.fotoUrl, dados.fotoRecortada, dados.estrelas, dados.posicao, dados.pePreferido, dados.desempenho]))
       .digest('hex')
       .slice(0, 12)}`;
     await servirComCache(reply, chave, () => renderCartinhaPng(dados));
@@ -131,7 +133,7 @@ export const rotasCartinha: FastifyPluginAsync = async (app) => {
     const orgId = await orgComum(req, req.usuario.id, org);
     const dados = await montarDados(req.usuario.id, orgId);
     const chave = `${req.usuario.id}-${createHash('sha1')
-      .update(JSON.stringify([dados.fotoUrl, dados.fotoRecortada, dados.estrelas, dados.posicao, dados.pePreferido, dados.desempenho]))
+      .update(JSON.stringify([VERSAO_LAYOUT, dados.fotoUrl, dados.fotoRecortada, dados.estrelas, dados.posicao, dados.pePreferido, dados.desempenho]))
       .digest('hex')
       .slice(0, 12)}`;
     await servirComCache(reply, chave, () => renderCartinhaPng(dados));
