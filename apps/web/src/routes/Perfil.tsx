@@ -86,7 +86,7 @@ export function Perfil() {
             size={64}
             recortada={usuario?.fotoRecortada}
           />
-          <span className="absolute -bottom-1 -right-1 grid h-6 w-6 place-items-center rounded-full bg-campo-600 text-white ring-2 ring-white">
+          <span className="absolute -bottom-1 -right-1 grid h-6 w-6 place-items-center rounded-full bg-gradient-to-b from-campo-300 to-campo-500 text-noite ring-2 ring-gramado-raised">
             {fotoEtapa ? (
               <Spinner className="h-3 w-3" />
             ) : (

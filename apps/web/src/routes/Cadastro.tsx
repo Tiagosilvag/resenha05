@@ -76,9 +76,9 @@ export function Cadastro() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="safe-top flex flex-col items-center bg-campo-700 bg-gramada px-6 pb-14 pt-10 text-center text-white">
-        <Logo size={84} />
-        <h1 className="mt-2 font-display text-2xl font-bold uppercase tracking-tight text-white">Criar cadastro</h1>
+      <header className="safe-top flex flex-col items-center bg-noite bg-brasao px-6 pb-14 pt-10 text-center text-white">
+        <Logo size={92} />
+        <h1 className="mt-3 font-display text-2xl font-bold uppercase tracking-tight text-campo-300">Criar cadastro</h1>
       </header>
 
       <div className="mx-auto -mt-9 w-full max-w-sm flex-1 px-6 pb-10">
@@ -96,7 +96,7 @@ export function Cadastro() {
               className="relative rounded-full transition-transform active:scale-95"
             >
               <Avatar src={previa} nome={nome} size={68} />
-              <span className="absolute -bottom-1 -right-1 grid h-6 w-6 place-items-center rounded-full bg-campo-600 text-white ring-2 ring-white">
+              <span className="absolute -bottom-1 -right-1 grid h-6 w-6 place-items-center rounded-full bg-gradient-to-b from-campo-300 to-campo-500 text-noite ring-2 ring-gramado-raised">
                 <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
                   <path d="M12 5v14M5 12h14" />
                 </svg>

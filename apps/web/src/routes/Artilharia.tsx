@@ -51,7 +51,7 @@ export function Artilharia() {
       ) : (
         <>
           {/* pódio */}
-          <div className="overflow-hidden rounded-2xl bg-campo-700 bg-gramada p-4 text-white shadow-pop">
+          <div className="overflow-hidden rounded-2xl bg-noite bg-brasao p-4 text-white shadow-pop">
             <p className="font-display text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-white/70">
               Pódio de goleadores
             </p>

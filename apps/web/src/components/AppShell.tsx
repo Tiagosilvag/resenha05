@@ -11,7 +11,7 @@ const ITENS: { to: string; rotulo: string; Icone: ComponentType<SVGProps<SVGSVGE
   { to: '/perfil', rotulo: 'Perfil', Icone: IconePerfil },
 ];
 
-function SeletorOrg({ className }: { className?: string }) {
+function SeletorOrg({ className, escuro = false }: { className?: string; escuro?: boolean }) {
   const { orgs, orgId, setOrgId } = useOrg();
   if (orgs.length < 2) return null;
   return (
@@ -20,15 +20,26 @@ function SeletorOrg({ className }: { className?: string }) {
         value={orgId}
         onChange={(e) => setOrgId(e.target.value)}
         aria-label="Trocar de organização"
-        className="w-full appearance-none rounded-full border border-campo-200 bg-white/90 py-1.5 pl-3 pr-8 font-display text-xs font-semibold uppercase tracking-[0.04em] text-campo-700"
+        className={[
+          'w-full appearance-none rounded-full border py-1.5 pl-3 pr-8 font-display text-xs font-semibold uppercase tracking-[0.04em]',
+          escuro
+            ? 'border-white/20 bg-white/10 text-white'
+            : 'border-campo-200 bg-gramado-raised/90 text-campo-700',
+        ].join(' ')}
       >
         {orgs.map((o) => (
-          <option key={o.id} value={o.id}>
+          <option key={o.id} value={o.id} className="text-tinta">
             {o.nome}
           </option>
         ))}
       </select>
-      <svg viewBox="0 0 24 24" className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 stroke-campo-600" fill="none" strokeWidth="2" strokeLinecap="round">
+      <svg
+        viewBox="0 0 24 24"
+        className={`pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 ${escuro ? 'stroke-white/70' : 'stroke-campo-600'}`}
+        fill="none"
+        strokeWidth="2"
+        strokeLinecap="round"
+      >
         <path d="m6 9 6 6 6-6" />
       </svg>
     </div>
@@ -39,9 +50,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col md:flex-row">
       {/* Sidebar — desktop */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r linha-cal bg-white/70 px-5 pb-6 pt-6 md:flex">
-        <div className="mb-5 flex justify-center">
-          <Logo size={92} />
+      <aside className="hidden w-60 shrink-0 flex-col border-r linha-cal bg-gramado-raised/70 px-5 pb-6 pt-7 md:flex">
+        <div className="mb-6 flex justify-center border-b border-campo-500/20 pb-6">
+          <Logo size={104} />
         </div>
         <SeletorOrg className="mb-7" />
         <nav className="flex flex-col gap-1">
@@ -54,8 +65,8 @@ export function AppShell({ children }: { children: ReactNode }) {
                 [
                   'flex items-center gap-3 rounded-xl px-3 py-2.5 font-display text-sm font-semibold uppercase tracking-[0.03em] transition-colors',
                   isActive
-                    ? 'bg-campo-600 text-white shadow-[0_8px_18px_-10px_rgba(23,82,48,.7)]'
-                    : 'text-tinta-soft hover:bg-campo-100/60 hover:text-campo-800',
+                    ? 'bg-gradient-to-b from-campo-300 to-campo-500 text-noite shadow-ouro'
+                    : 'text-tinta-soft hover:bg-campo-100/70 hover:text-campo-800',
                 ].join(' ')
               }
             >
@@ -68,16 +79,17 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Conteúdo */}
       <main className="flex-1 pb-24 md:pb-10">
-        <header className="safe-top flex items-center gap-3 border-b border-campo-800 bg-campo-700 bg-gramada px-4 py-2.5 text-white md:hidden">
-          <Logo size={40} />
-          <span className="font-display text-lg font-bold uppercase tracking-tight">Resenha05</span>
-          <SeletorOrg className="ml-auto max-w-[46%]" />
+        <header className="safe-top relative flex items-center justify-center border-b border-campo-500/25 bg-noite bg-brasao px-4 py-3 text-white md:hidden">
+          <Logo size={48} />
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 max-w-[44%]">
+            <SeletorOrg escuro />
+          </div>
         </header>
         <div className="px-4 py-5 md:px-9 md:py-9">{children}</div>
       </main>
 
       {/* Bottom nav — mobile */}
-      <nav className="safe-bottom fixed inset-x-0 bottom-0 z-20 mx-auto flex max-w-3xl border-t linha-cal bg-white/95 backdrop-blur md:hidden">
+      <nav className="safe-bottom fixed inset-x-0 bottom-0 z-20 mx-auto flex max-w-3xl border-t border-campo-500/20 bg-noite/95 backdrop-blur md:hidden">
         {ITENS.map(({ to, rotulo, Icone, exact }) => (
           <NavLink
             key={to}
@@ -86,13 +98,13 @@ export function AppShell({ children }: { children: ReactNode }) {
             className={({ isActive }) =>
               [
                 'relative flex flex-1 flex-col items-center gap-1 pb-2 pt-2.5 font-display text-[0.68rem] font-semibold uppercase tracking-[0.04em] transition-colors',
-                isActive ? 'text-campo-700' : 'text-tinta-faint',
+                isActive ? 'text-campo-300' : 'text-white/45',
               ].join(' ')
             }
           >
             {({ isActive }) => (
               <>
-                {isActive && <span className="absolute inset-x-5 top-0 h-0.5 rounded-full bg-campo-600" />}
+                {isActive && <span className="absolute inset-x-5 top-0 h-0.5 rounded-full bg-campo-400" />}
                 <Icone width={22} height={22} />
                 {rotulo}
               </>

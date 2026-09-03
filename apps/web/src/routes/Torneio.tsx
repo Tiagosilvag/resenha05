@@ -93,7 +93,7 @@ export function Torneio() {
                   <td className="py-2.5 pl-3 pr-1">
                     <span
                       className={`grid h-5 w-5 place-items-center rounded font-display text-xs font-bold ${
-                        i === 0 ? 'bg-campo-600 text-white' : 'bg-gramado-sunk text-tinta-soft'
+                        i === 0 ? 'bg-gradient-to-b from-campo-300 to-campo-500 text-noite' : 'bg-gramado-sunk text-tinta-soft'
                       }`}
                     >
                       {i + 1}

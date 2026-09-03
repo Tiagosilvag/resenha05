@@ -4,40 +4,61 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Verde de campo — a voz principal.
+        // Ouro do brasão — a voz principal (era o verde de campo).
         campo: {
+          50: '#FBF6E8',
+          100: '#F4E8C6',
+          200: '#E9D399',
+          300: '#DEBB63',
+          400: '#CFA13C',
+          500: '#B78628',
+          600: '#946A1D',
+          700: '#6E4F16',
+          800: '#4A3510',
+          900: '#2C1F09',
+        },
+        // Verde de grama — segunda voz: confirmado, presença, "em campo".
+        grama: {
           50: '#EEF5EE',
-          100: '#D8EBDB',
-          200: '#AFD5B7',
-          300: '#7EBB8D',
-          400: '#4CAE7A',
-          500: '#2E8B54',
-          600: '#1F6B42',
-          700: '#175230',
-          800: '#123F26',
-          900: '#0B2917',
+          100: '#DBEBDD',
+          200: '#B4D3B9',
+          300: '#82B98E',
+          400: '#4FA173',
+          500: '#3B8659',
+          600: '#2C6845',
+          700: '#215033',
+          800: '#173A25',
+          900: '#0E2617',
         },
-        // Superfícies — off-white morno com viés verde, "cal sobre grama".
+        // Noite — preto morno do brasão, para o chrome (topo, nav, placar).
+        noite: {
+          DEFAULT: '#15110A',
+          raised: '#221C12',
+          line: '#3A3020',
+        },
+        // Superfícies — creme morno, "cal sobre a mesa".
         gramado: {
-          bg: '#EFF3EA',
-          raised: '#FFFFFF',
-          sunk: '#E5EBDD',
-          dark: '#0C1A12',
+          bg: '#F5F0E4',
+          raised: '#FFFDF7',
+          sunk: '#EBE3D1',
+          dark: '#15110A',
         },
-        // Tinta — preto-verde, nunca #000.
+        // Tinta — marrom-café bem escuro, nunca #000.
         tinta: {
-          DEFAULT: '#16211B',
-          soft: '#46564D',
-          faint: '#6E7E72',
-          line: '#CBD7C4',
+          DEFAULT: '#221C10',
+          soft: '#5B5240',
+          faint: '#8A7E64',
+          line: '#E4DBC5',
         },
-        // Ouro — segunda voz: destaque, troféu, placar aceso.
+        // Ouro aceso — brilho sobre superfícies escuras (placar, estrelas, troféu).
         ouro: {
-          100: '#F7ECD4',
-          300: '#EFC873',
-          500: '#DFA129',
-          600: '#B87E17',
-          700: '#8A5D12',
+          100: '#F8EFD3',
+          200: '#F0DDA6',
+          300: '#E7C158',
+          400: '#DCAE3A',
+          500: '#C6902B',
+          600: '#9E7020',
+          700: '#6E4E15',
         },
         // Barro — perigo / desistência.
         barro: {
@@ -58,14 +79,18 @@ export default {
         '2xl': '1.125rem',
       },
       boxShadow: {
-        raise: '0 1px 2px rgba(11,41,23,.06), 0 10px 28px -12px rgba(11,41,23,.14)',
-        pop: '0 2px 6px rgba(11,41,23,.08), 0 18px 40px -16px rgba(11,41,23,.28)',
+        raise: '0 1px 2px rgba(30,22,6,.06), 0 10px 28px -12px rgba(30,22,6,.16)',
+        pop: '0 2px 6px rgba(30,22,6,.09), 0 18px 40px -16px rgba(30,22,6,.30)',
         scoreboard: 'inset 0 2px 10px rgba(0,0,0,.55), 0 1px 0 rgba(255,255,255,.05)',
+        ouro: '0 8px 22px -10px rgba(183,134,40,.55)',
       },
       backgroundImage: {
-        // Grama recém-cortada — faixas diagonais bem sutis.
+        // Textura sutil de fundo — fios de ouro bem discretos.
         gramada:
-          'repeating-linear-gradient(118deg, rgba(31,107,66,.05) 0 44px, rgba(31,107,66,0) 44px 88px)',
+          'repeating-linear-gradient(118deg, rgba(120,92,28,.045) 0 46px, rgba(120,92,28,0) 46px 92px)',
+        // Brilho dourado no topo dos painéis escuros.
+        brasao:
+          'radial-gradient(120% 120% at 50% -10%, rgba(231,193,88,.16) 0%, rgba(231,193,88,0) 62%)',
       },
       keyframes: {
         'fade-up': {

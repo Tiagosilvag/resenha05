@@ -68,7 +68,7 @@ export function Pelada() {
   return (
     <div className="flex flex-col gap-5">
       {/* cabeçalho */}
-      <div className="overflow-hidden rounded-2xl bg-campo-700 bg-gramada p-5 text-white shadow-pop">
+      <div className="overflow-hidden rounded-2xl bg-noite bg-brasao p-5 text-white shadow-pop">
         <p className="font-display text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-white/70">
           Próxima pelada
         </p>

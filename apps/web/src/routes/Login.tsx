@@ -31,7 +31,7 @@ export function Login() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="safe-top flex flex-col items-center bg-campo-700 bg-gramada px-6 pb-16 pt-14 text-center text-white">
+      <header className="safe-top flex flex-col items-center bg-noite bg-brasao px-6 pb-16 pt-14 text-center text-white">
         <Logo size={132} />
         <p className="mt-3 text-sm text-white/85">A pelada organizada do início ao fim.</p>
       </header>

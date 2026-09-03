@@ -22,18 +22,18 @@ export function Button({
     'inline-flex select-none items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-display text-[0.95rem] font-semibold uppercase tracking-[0.03em] transition-[transform,background,box-shadow] duration-150 active:scale-[.98] disabled:pointer-events-none disabled:opacity-50';
   const estilos: Record<Variante, string> = {
     primario:
-      'bg-campo-600 text-white shadow-[inset_0_1px_0_rgba(255,255,255,.18),0_8px_20px_-8px_rgba(23,82,48,.6)] hover:bg-campo-700',
+      'bg-gradient-to-b from-campo-200 via-campo-300 to-campo-500 text-noite shadow-ouro [box-shadow:inset_0_1px_0_rgba(255,255,255,.45),0_8px_22px_-10px_rgba(183,134,40,.6)] [text-shadow:0_1px_0_rgba(255,255,255,.3)] hover:from-campo-100 hover:via-campo-200 hover:to-campo-400',
     secundario:
-      'border border-campo-200 bg-white text-campo-700 hover:border-campo-300 hover:bg-campo-50',
-    fantasma: 'text-campo-700 hover:bg-campo-100/60',
-    perigo: 'border border-barro-100 bg-white text-barro-600 hover:bg-barro-100/50',
+      'border border-campo-300 bg-gramado-raised text-campo-800 hover:border-campo-400 hover:bg-campo-50',
+    fantasma: 'text-campo-800 hover:bg-campo-100/70',
+    perigo: 'border border-barro-100 bg-gramado-raised text-barro-600 hover:bg-barro-100/50',
   };
   return <button className={cn(base, estilos[variante], className)} {...props} />;
 }
 
 /* ── Campos ───────────────────────────────────────────────────────────────── */
 const campoBase =
-  'w-full rounded-xl border border-tinta-line bg-white px-3.5 py-2.5 text-[0.95rem] text-tinta outline-none transition-colors placeholder:text-tinta-faint/70 focus:border-campo-400 focus:ring-4 focus:ring-campo-100';
+  'w-full rounded-xl border border-tinta-line bg-gramado-raised px-3.5 py-2.5 text-[0.95rem] text-tinta outline-none transition-colors placeholder:text-tinta-faint/70 focus:border-campo-400 focus:ring-4 focus:ring-campo-100';
 
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={cn(campoBase, className)} {...props} />;
@@ -124,7 +124,7 @@ export function Aviso({ tipo = 'info', children }: { tipo?: TomAviso; children: 
   const estilos: Record<TomAviso, string> = {
     info: 'border-campo-200 bg-campo-50 text-campo-800',
     erro: 'border-barro-100 bg-barro-100/50 text-barro-600',
-    ok: 'border-campo-300 bg-campo-100/70 text-campo-800',
+    ok: 'border-grama-200 bg-grama-50 text-grama-800',
   };
   return (
     <div className={cn('flex items-start gap-2 rounded-xl border px-3.5 py-2.5 text-sm', estilos[tipo])}>
@@ -136,8 +136,8 @@ export function Aviso({ tipo = 'info', children }: { tipo?: TomAviso; children: 
 /* ── Chip de status (ponto + rótulo) ──────────────────────────────────────── */
 type TomChip = 'confirmado' | 'pago' | 'desistiu' | 'pendente' | 'neutro';
 const CHIP: Record<TomChip, { cls: string; ponto: string }> = {
-  confirmado: { cls: 'bg-campo-100 text-campo-800', ponto: 'bg-campo-500' },
-  pago: { cls: 'bg-ouro-100 text-ouro-700', ponto: 'bg-ouro-500' },
+  confirmado: { cls: 'bg-grama-100 text-grama-800', ponto: 'bg-grama-500' },
+  pago: { cls: 'bg-campo-100 text-campo-800', ponto: 'bg-campo-500' },
   desistiu: { cls: 'bg-tinta-line/40 text-tinta-faint', ponto: 'bg-tinta-faint' },
   pendente: { cls: 'bg-ouro-100 text-ouro-700', ponto: 'bg-ouro-500' },
   neutro: { cls: 'bg-gramado-sunk text-tinta-soft', ponto: 'bg-tinta-faint' },
@@ -198,7 +198,7 @@ export function Avatar({
     return (
       <span
         style={estilo}
-        className="inline-flex items-center justify-center rounded-full bg-campo-100 font-display text-[0.8rem] font-bold text-campo-700 ring-2 ring-white"
+        className="inline-flex items-center justify-center rounded-full bg-campo-100 font-display text-[0.8rem] font-bold text-campo-800 ring-2 ring-gramado-raised"
       >
         {iniciais}
       </span>
@@ -208,8 +208,8 @@ export function Avatar({
     <span
       style={estilo}
       className={cn(
-        'inline-block overflow-hidden rounded-full ring-2 ring-white shadow-sm',
-        recortada && 'bg-gradient-to-b from-campo-400 to-campo-700',
+        'inline-block overflow-hidden rounded-full ring-2 ring-gramado-raised shadow-sm',
+        recortada && 'bg-gradient-to-b from-noite-raised to-noite',
       )}
     >
       <img
