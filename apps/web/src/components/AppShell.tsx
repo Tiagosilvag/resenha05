@@ -5,6 +5,7 @@ import { Logo } from './Logo';
 const ITENS = [
   { to: '/', rotulo: 'Início', icone: '🏠', exact: true },
   { to: '/peladas', rotulo: 'Peladas', icone: '⚽' },
+  { to: '/torneios', rotulo: 'Torneios', icone: '🏆' },
   { to: '/perfil', rotulo: 'Perfil', icone: '👤' },
 ];
 

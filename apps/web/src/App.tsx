@@ -11,6 +11,10 @@ import { CompletarCadastro } from './routes/CompletarCadastro';
 import { Administradores } from './routes/Administradores';
 import { Peladas } from './routes/Peladas';
 import { Pelada } from './routes/Pelada';
+import { Torneios } from './routes/Torneios';
+import { Torneio } from './routes/Torneio';
+import { Jogo } from './routes/Jogo';
+import { Artilharia } from './routes/Artilharia';
 import { EntrarOrg } from './routes/EntrarOrg';
 
 function Protegida({ children }: { children: ReactNode }) {
@@ -39,6 +43,10 @@ export function App() {
       <Route path="/perfil" element={<Protegida><Perfil /></Protegida>} />
       <Route path="/peladas" element={<Protegida><Peladas /></Protegida>} />
       <Route path="/peladas/:peladaId" element={<Protegida><Pelada /></Protegida>} />
+      <Route path="/torneios" element={<Protegida><Torneios /></Protegida>} />
+      <Route path="/torneios/:torneioId" element={<Protegida><Torneio /></Protegida>} />
+      <Route path="/jogos/:jogoId" element={<Protegida><Jogo /></Protegida>} />
+      <Route path="/artilharia" element={<Protegida><Artilharia /></Protegida>} />
       <Route path="/org/:orgId/admins" element={<Protegida><Administradores /></Protegida>} />
       <Route path="/entrar-org/:orgId" element={<Protegida><EntrarOrg /></Protegida>} />
 

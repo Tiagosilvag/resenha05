@@ -113,6 +113,57 @@ export interface TimeJogadoresTable {
   estrelas: number;
 }
 
+export interface TorneiosTable {
+  id: Generated<string>;
+  organizacao_id: string;
+  nome: string;
+  formato: 'grupos' | 'mata_mata' | 'pontos_corridos';
+  status: Generated<'em_andamento' | 'encerrado' | 'cancelado'>;
+  criado_em: Generated<Timestamp>;
+}
+
+export interface TorneioTimesTable {
+  id: Generated<string>;
+  torneio_id: string;
+  nome: string;
+  grupo: string | null;
+}
+
+export interface JogosTable {
+  id: Generated<string>;
+  torneio_id: string | null;
+  pelada_id: string | null;
+  fase: string | null;
+  time_a_id: string | null;
+  time_b_id: string | null;
+  time_a_nome: string | null;
+  time_b_nome: string | null;
+  placar_a: number | null;
+  placar_b: number | null;
+  data: Timestamp | null;
+  status: Generated<'agendado' | 'em_andamento' | 'encerrado'>;
+  criado_em: Generated<Timestamp>;
+}
+
+export interface SumulaEventosTable {
+  id: Generated<string>;
+  jogo_id: string;
+  profile_id: string;
+  time_id: string | null;
+  tipo: 'gol' | 'gol_contra' | 'assistencia' | 'cartao_amarelo' | 'cartao_vermelho';
+  minuto: number | null;
+  criado_em: Generated<Timestamp>;
+}
+
+export interface VEventosJogadorView {
+  id: string;
+  profile_id: string;
+  tipo: string;
+  jogo_id: string;
+  quando: Timestamp;
+  organizacao_id: string | null;
+}
+
 export interface Database {
   profiles: ProfilesTable;
   sessoes: SessoesTable;
@@ -125,4 +176,9 @@ export interface Database {
   sorteios: SorteiosTable;
   times: TimesTable;
   time_jogadores: TimeJogadoresTable;
+  torneios: TorneiosTable;
+  torneio_times: TorneioTimesTable;
+  jogos: JogosTable;
+  sumula_eventos: SumulaEventosTable;
+  v_eventos_jogador: VEventosJogadorView;
 }
