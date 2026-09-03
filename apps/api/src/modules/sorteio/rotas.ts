@@ -4,6 +4,13 @@ import { db } from '../../db/index.js';
 import { validar } from '../../lib/validar.js';
 import { erro } from '../../lib/erros.js';
 import { exigirAdmin, exigirMembro } from '../../plugins/auth.js';
+import { renderSorteioArtePng, type TimeArte } from '../../lib/sorteio-arte.js';
+
+function dataPorExtenso(iso: string): string {
+  const d = new Date(iso.slice(0, 10) + 'T12:00:00');
+  const s = d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 
 async function peladaComOrg(peladaId: string) {
   const p = await db
@@ -135,5 +142,59 @@ export const rotasSorteio: FastifyPluginAsync = async (app) => {
       }
     }
     return { sorteio, times: [...mapa.values()].sort((a, b) => a.numero - b.numero) };
+  });
+
+  // Arte compartilhável do último sorteio da pelada.
+  app.get('/peladas/:peladaId/sorteio/arte.png', async (req, reply) => {
+    const { peladaId } = req.params as { peladaId: string };
+    const pelada = await db
+      .selectFrom('peladas as pl')
+      .innerJoin('organizacoes as o', 'o.id', 'pl.organizacao_id')
+      .select(['pl.id', 'pl.organizacao_id', 'pl.data', 'o.nome as orgNome'])
+      .where('pl.id', '=', peladaId)
+      .executeTakeFirst();
+    if (!pelada) throw erro.naoEncontrado('Pelada não encontrada.');
+    exigirMembro(req, pelada.organizacao_id);
+
+    const sorteio = await db
+      .selectFrom('sorteios')
+      .select('id')
+      .where('pelada_id', '=', peladaId)
+      .orderBy('criado_em', 'desc')
+      .executeTakeFirst();
+    if (!sorteio) throw erro.naoEncontrado('Esta pelada ainda não teve sorteio.');
+
+    const linhas = await db
+      .selectFrom('times as t')
+      .leftJoin('time_jogadores as tj', 'tj.time_id', 't.id')
+      .leftJoin('profiles as p', 'p.id', 'tj.profile_id')
+      .select(['t.numero as numero', 't.nome as nomeTime', 'p.nome as nome', 'tj.estrelas as estrelas'])
+      .where('t.sorteio_id', '=', sorteio.id)
+      .orderBy('t.numero')
+      .orderBy('tj.estrelas', 'desc')
+      .execute();
+
+    const mapa = new Map<number, TimeArte>();
+    for (const l of linhas) {
+      let time = mapa.get(l.numero);
+      if (!time) {
+        time = { numero: l.numero, nome: l.nomeTime, totalEstrelas: 0, jogadores: [] };
+        mapa.set(l.numero, time);
+      }
+      if (l.nome !== null || l.estrelas !== null) {
+        time.jogadores.push({ nome: l.nome, estrelas: l.estrelas ?? 3 });
+        time.totalEstrelas += l.estrelas ?? 0;
+      }
+    }
+    const times = [...mapa.values()].sort((a, b) => a.numero - b.numero);
+    const totais = times.map((t) => t.totalEstrelas);
+
+    const png = await renderSorteioArtePng({
+      organizacao: pelada.orgNome,
+      quando: dataPorExtenso(String(pelada.data)),
+      times,
+      amplitude: totais.length ? Math.max(...totais) - Math.min(...totais) : 0,
+    });
+    reply.header('content-type', 'image/png').header('cache-control', 'public, max-age=120').send(png);
   });
 };

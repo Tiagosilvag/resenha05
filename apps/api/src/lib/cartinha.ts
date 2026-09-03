@@ -1,8 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import satori from 'satori';
-import { Resvg } from '@resvg/resvg-js';
 import {
   ATRIBUTOS,
   ROTULO_ATRIBUTO,
@@ -13,36 +10,9 @@ import {
   type Posicao,
 } from '@resenha05/shared';
 import { UPLOADS_DIR } from './uploads.js';
+import { PALETA, h, elementoParaPng } from './satori-base.js';
 
-const require = createRequire(import.meta.url);
-
-// ── paleta ────────────────────────────────────────────────────────────────
-const OURO = '#E7C158';
-const OURO_ESCURO = '#B9902F';
-const CRE = '#F3EEDF';
-const DIM = '#8C7C4E';
-
-// ── fontes (carregadas uma vez) ───────────────────────────────────────────
-let fontesCache: { name: string; data: Buffer; weight: 400 | 600 | 700 | 800; style: 'normal' }[] | null =
-  null;
-
-async function fontes() {
-  if (fontesCache) return fontesCache;
-  const f = (pkg: string, file: string) => readFile(require.resolve(`${pkg}/files/${file}`));
-  fontesCache = [
-    { name: 'Barlow', data: await f('@fontsource/barlow', 'barlow-latin-400-normal.woff'), weight: 400, style: 'normal' },
-    { name: 'Barlow', data: await f('@fontsource/barlow', 'barlow-latin-600-normal.woff'), weight: 600, style: 'normal' },
-    { name: 'Barlow Condensed', data: await f('@fontsource/barlow-condensed', 'barlow-condensed-latin-700-normal.woff'), weight: 700, style: 'normal' },
-    { name: 'Barlow Condensed', data: await f('@fontsource/barlow-condensed', 'barlow-condensed-latin-800-normal.woff'), weight: 800, style: 'normal' },
-  ];
-  return fontesCache;
-}
-
-// helper de elemento (evita JSX no build da API)
-type El = { type: string; props: Record<string, unknown> & { children?: unknown } };
-function h(type: string, props: Record<string, unknown>, ...children: unknown[]): El {
-  return { type, props: { ...props, children: children.length === 1 ? children[0] : children } };
-}
+const { ouro: OURO, ouroEscuro: OURO_ESCURO, creme: CRE, dim: DIM } = PALETA;
 
 async function fotoDataUri(fotoUrl: string | null): Promise<string | null> {
   if (!fotoUrl) return null;
@@ -102,7 +72,6 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
         borderRadius: 40,
       },
     },
-    // topo
     h(
       'div',
       { style: { display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'flex-start' } },
@@ -134,7 +103,6 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
         'R5',
       ),
     ),
-    // foto
     h(
       'div',
       {
@@ -155,15 +123,11 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
         ? h('img', { src: foto, width: 300, height: 300, style: { objectFit: 'cover' } })
         : h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 800, fontSize: 96, color: OURO } }, 'R5'),
     ),
-    // nome
     h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 800, fontSize: 60, color: OURO, marginTop: 20, textAlign: 'center' } }, nome),
     h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 22, color: DIM, letterSpacing: 3 } }, 'RESENHA 05'),
-    // divisória
     h('div', { style: { display: 'flex', width: 460, height: 3, backgroundColor: OURO_ESCURO, marginTop: 18, marginBottom: 18 } }),
-    // stats
     h('div', { style: { display: 'flex', width: '100%', justifyContent: 'space-between', marginBottom: 26 } }, ...ATRIBUTOS.slice(0, 3).map(stat)),
     h('div', { style: { display: 'flex', width: '100%', justifyContent: 'space-between' } }, ...ATRIBUTOS.slice(3).map(stat)),
-    // rodapé — estrelas (losangos) refletindo a habilidade
     h(
       'div',
       { style: { display: 'flex', gap: 14, marginTop: 'auto' } },
@@ -183,11 +147,5 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
     ),
   );
 
-  const svg = await satori(arvore as unknown as Parameters<typeof satori>[0], {
-    width: L,
-    height: A,
-    fonts: await fontes(),
-  });
-
-  return Buffer.from(new Resvg(svg, { fitTo: { mode: 'width', value: L } }).render().asPng());
+  return elementoParaPng(arvore, { width: L, height: A });
 }

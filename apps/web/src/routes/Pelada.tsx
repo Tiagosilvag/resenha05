@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../lib/auth';
-import { api, ApiError } from '../lib/api';
+import { api, ApiError, baixarPng } from '../lib/api';
 import { Avatar, Aviso, Button, Card, Chip, Estrelas, Eyebrow, Spinner, StatTile } from '../components/ui';
 import { CartinhaModal } from '../components/Cartinha';
 
@@ -215,6 +215,18 @@ function PainelSorteio({
         <p className="mt-2 text-xs text-tinta-faint">
           Diferença entre o time mais forte e o mais fraco: {sortear.data.amplitudeEstrelas} estrela(s).
         </p>
+      )}
+
+      {times.length > 0 && (
+        <button
+          className="mt-3 inline-flex items-center gap-2 rounded-xl border border-ouro-500/40 bg-gramado-dark px-4 py-2 font-display text-sm font-semibold uppercase tracking-[0.04em] text-ouro-300"
+          onClick={() => baixarPng(`/peladas/${peladaId}/sorteio/arte.png`, 'sorteio-resenha05.png')}
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M12 4v11m0 0 4-4m-4 4-4-4M5 19h14" />
+          </svg>
+          Baixar arte do sorteio
+        </button>
       )}
 
       <div className="mt-3 grid gap-2.5 sm:grid-cols-2">

@@ -59,6 +59,20 @@ async function renovar(): Promise<boolean> {
   return renovando;
 }
 
+/** Baixa um PNG protegido (envia o token, salva o blob). */
+export async function baixarPng(path: string, nomeArquivo: string): Promise<void> {
+  const headers = new Headers();
+  if (tokens.access) headers.set('authorization', `Bearer ${tokens.access}`);
+  const r = await fetch(`${BASE}${path}`, { headers });
+  if (!r.ok) throw new ApiError(r.status, 'Não foi possível gerar a imagem.');
+  const url = URL.createObjectURL(await r.blob());
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nomeArquivo;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
 export async function api<T = unknown>(
   path: string,
   opcoes: RequestInit & { json?: unknown } = {},
