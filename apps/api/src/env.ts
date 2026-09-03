@@ -24,6 +24,10 @@ const schema = z.object({
   // Pasta onde as fotos de perfil são gravadas (volume no compose).
   UPLOADS_DIR: z.string().default('uploads'),
 
+  // Serviço interno de recorte de fundo (container `bgremove` no compose).
+  // Vazio = recurso desligado: a foto é salva sem recorte.
+  BGREMOVE_URL: z.string().url().optional(),
+
   N8N_PAGAMENTO_WEBHOOK_URL: z.string().url().optional(),
   MERCADOPAGO_PLATAFORMA_TOKEN: z.string().optional(),
 

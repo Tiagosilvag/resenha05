@@ -8,6 +8,7 @@ import { db } from '../../db/index.js';
 import { validar } from '../../lib/validar.js';
 import { erro } from '../../lib/erros.js';
 import { salvarAvatar, extPara } from '../../lib/uploads.js';
+import { recortarFundo } from '../../lib/bgremove.js';
 
 const TAM_MAX = 6 * 1024 * 1024;
 
@@ -85,7 +86,8 @@ export const rotasPerfil: FastifyPluginAsync = async (app) => {
   });
 
   // Fase 1 — upload de foto: multipart direto, gravado num volume do servidor.
-  // Campo opcional `recortada=true` quando o navegador já tirou o fundo (FUT).
+  // Campo `recortar=true` pede o recorte de fundo (card estilo FIFA), feito
+  // pelo container interno `bgremove`. Se o recorte falhar, salva a original.
   app.post('/perfil/foto', async (req) => {
     const arquivo = await req.file({ limits: { fileSize: TAM_MAX } });
     if (!arquivo) throw erro.invalido('Envie uma imagem no campo "foto".');
@@ -93,9 +95,8 @@ export const rotasPerfil: FastifyPluginAsync = async (app) => {
     const ext = extPara(arquivo.mimetype);
     if (!ext) throw erro.invalido('Formato inválido. Use JPEG, PNG ou WebP.');
 
-    const recortada =
-      (arquivo.fields.recortada as { value?: string } | undefined)?.value === 'true' &&
-      arquivo.mimetype === 'image/png';
+    const pediuRecorte =
+      (arquivo.fields.recortar as { value?: string } | undefined)?.value === 'true';
 
     let dados: Buffer;
     try {
@@ -105,7 +106,18 @@ export const rotasPerfil: FastifyPluginAsync = async (app) => {
     }
     if (arquivo.file.truncated) throw erro.invalido('Imagem muito grande (máx. 6 MB).');
 
-    const fotoUrl = await salvarAvatar(req.usuario.id, dados, ext);
+    let extFinal = ext;
+    let recortada = false;
+    if (pediuRecorte) {
+      const png = await recortarFundo(dados, arquivo.mimetype);
+      if (png) {
+        dados = png;
+        extFinal = 'png';
+        recortada = true;
+      }
+    }
+
+    const fotoUrl = await salvarAvatar(req.usuario.id, dados, extFinal);
     await db
       .updateTable('profiles')
       .set({ foto_url: fotoUrl, foto_recortada: recortada })

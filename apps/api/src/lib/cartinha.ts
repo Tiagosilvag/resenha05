@@ -56,24 +56,52 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
       h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 800, fontSize: 52, color: CRE, lineHeight: 1 } }, String(at[a])),
     );
 
-  // Foto: recortada = jogador "saindo" da moldura (estilo FUT);
-  // senão = janela grande com as bordas se fundindo à carta.
+  // Foto: recortada = jogador "saindo" da moldura (estilo FUT), preenchendo
+  // a carta atrás dos números; senão = janela grande se fundindo à carta.
   const camadaFoto: El = recortada
     ? h(
         'div',
         {
           style: {
             position: 'absolute',
-            top: 24,
+            top: 0,
             left: 0,
-            right: 0,
-            height: 640,
+            width: L - 12,
+            height: A - 12,
             display: 'flex',
             alignItems: 'flex-end',
             justifyContent: 'center',
+            overflow: 'hidden',
+            borderRadius: 34,
           },
         },
-        h('img', { src: foto!, style: { height: 640, objectFit: 'contain' } }),
+        h('img', { src: foto!, style: { height: 858, objectFit: 'contain' } }),
+        // scrim de topo — mantém OVR/posição/brasão legíveis sobre qualquer foto
+        h('div', {
+          style: {
+            display: 'flex',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: L - 12,
+            height: 320,
+            backgroundImage:
+              'linear-gradient(to bottom, rgba(10,10,11,0.72) 0%, rgba(10,10,11,0.28) 50%, rgba(10,10,11,0) 100%)',
+          },
+        }),
+        // scrim inferior — os pés do jogador dissolvem na placa de nome
+        h('div', {
+          style: {
+            display: 'flex',
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            width: L - 12,
+            height: 560,
+            backgroundImage:
+              'linear-gradient(to top, #0b0b0c 0%, rgba(11,11,12,0.98) 22%, rgba(11,11,12,0.78) 44%, rgba(11,11,12,0.35) 70%, rgba(11,11,12,0) 100%)',
+          },
+        }),
       )
     : h(
         'div',
@@ -120,9 +148,9 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
     h(
       'div',
       { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start' } },
-      h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 800, fontSize: 110, color: OURO, lineHeight: 0.9, textShadow: '0 3px 10px rgba(0,0,0,0.7)' } }, String(at.overall)),
-      h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 32, color: OURO, letterSpacing: 4, marginTop: 4 } }, pos),
-      h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 22, color: DIM, letterSpacing: 3, marginTop: 5 } }, `PÉ ${pe}`),
+      h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 800, fontSize: 110, color: OURO, lineHeight: 0.9, textShadow: '0 4px 14px rgba(0,0,0,0.85)' } }, String(at.overall)),
+      h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 32, color: OURO, letterSpacing: 4, marginTop: 4, textShadow: '0 2px 8px rgba(0,0,0,0.85)' } }, pos),
+      h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 22, color: recortada ? CRE : DIM, letterSpacing: 3, marginTop: 5, textShadow: '0 2px 8px rgba(0,0,0,0.85)' } }, `PÉ ${pe}`),
     ),
     h('img', { src: logo, style: { display: 'flex', height: 132, width: 88 } }),
   );
@@ -164,13 +192,14 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
             'radial-gradient(circle at 50% 15%, #2c2510 0%, #14130f 48%, #0a0a0b 100%), linear-gradient(125deg, rgba(231,193,88,0.10) 0%, rgba(231,193,88,0) 38%, rgba(231,193,88,0) 62%, rgba(231,193,88,0.08) 100%)',
           border: `6px solid ${OURO_ESCURO}`,
           borderRadius: 40,
+          overflow: 'hidden',
         },
       },
       ...children,
     );
 
   const infoInferior: El[] = [
-    h('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: recortada ? 4 : 14 } },
+    h('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: recortada ? 0 : 14 } },
       h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 800, fontSize: 54, color: OURO, textAlign: 'center', lineHeight: 1 } }, nome),
       h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 20, color: DIM, letterSpacing: 3, marginTop: 6 } }, 'RESENHA 05'),
     ),
@@ -180,8 +209,25 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
     rodape,
   ];
 
+  const conteudoRecortado = h(
+    'div',
+    {
+      style: {
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        width: '100%',
+        flexGrow: 1,
+      },
+    },
+    topo,
+    h('div', { style: { display: 'flex', flexGrow: 1 } }),
+    ...infoInferior,
+  );
+
   const arvore = recortada
-    ? bloco([camadaFoto, topo, h('div', { style: { display: 'flex', height: 420 } }), ...infoInferior])
+    ? bloco([camadaFoto, conteudoRecortado])
     : bloco([topo, camadaFoto, ...infoInferior]);
 
   return elementoParaPng(arvore, { width: L, height: A });

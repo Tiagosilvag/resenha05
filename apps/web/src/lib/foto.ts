@@ -38,18 +38,25 @@ async function comprimir(arquivo: File): Promise<Blob> {
   }
 }
 
+interface OpcoesEnvio {
+  /** pede o recorte de fundo (card estilo FIFA), feito no servidor */
+  recortar?: boolean;
+  onEtapa?: (e: EtapaFoto) => void;
+}
+
 /** Envia a foto de perfil (multipart) para a API e devolve a URL pública. */
 export async function enviarFoto(
   arquivo: File,
-  onEtapa?: (e: EtapaFoto) => void,
+  opcoes: OpcoesEnvio = {},
 ): Promise<{ fotoUrl: string; recortada: boolean }> {
+  const { recortar = false, onEtapa } = opcoes;
   onEtapa?.('preparando');
   const imagem = await comprimir(arquivo);
   const nome = imagem === arquivo ? arquivo.name : 'foto.jpg';
 
   onEtapa?.('enviando');
   const fd = new FormData();
-  fd.append('recortada', 'false');
+  fd.append('recortar', recortar ? 'true' : 'false');
   fd.append('foto', imagem, nome);
 
   const headers = new Headers();
@@ -72,5 +79,8 @@ export async function enviarFoto(
       ?? 'Falha ao enviar a foto.';
     throw new ApiError(resp.status, msg);
   }
-  return { fotoUrl: (corpo as { fotoUrl: string }).fotoUrl, recortada: false };
+  return {
+    fotoUrl: (corpo as { fotoUrl: string }).fotoUrl,
+    recortada: Boolean((corpo as { recortada?: boolean }).recortada),
+  };
 }

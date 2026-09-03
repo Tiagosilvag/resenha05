@@ -52,6 +52,8 @@ services:
       RESENHA05_ENC_KEY: ${RESENHA05_ENC_KEY}
       WEB_ORIGIN: ${WEB_ORIGIN:-https://resenha05.coffetech.com.br}
       UPLOADS_DIR: /data/uploads
+      # Recorte de fundo da foto (card estilo FIFA) — container interno abaixo.
+      BGREMOVE_URL: http://bgremove:7000
     volumes:
       - avatars:/data/uploads
     healthcheck:
@@ -74,6 +76,20 @@ services:
       - api
     expose:
       - '80'
+
+  # Recorte de fundo da foto de perfil. Só a API fala com ele (rede interna);
+  # a foto não sai do servidor. Teto de memória pra não brigar com o resto do host.
+  bgremove:
+    build:
+      context: ./services/bgremove
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      ORT_THREADS: '2'
+    mem_limit: 768m
+    cpus: 1.5
+    expose:
+      - '7000'
 
 volumes:
   db_data:

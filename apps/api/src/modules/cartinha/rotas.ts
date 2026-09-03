@@ -10,7 +10,7 @@ import { renderCartinhaPng, type DadosCartinha } from '../../lib/cartinha.js';
 
 const DIR_CARDS = join(UPLOADS_DIR, 'cards');
 // Suba quando o layout da cartinha mudar, para invalidar o cache do volume.
-const VERSAO_LAYOUT = 4;
+const VERSAO_LAYOUT = 5;
 
 /** Descobre uma organização em comum entre quem pede e o alvo. */
 async function orgComum(req: FastifyRequest, alvo: string, preferida?: string): Promise<string> {

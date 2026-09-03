@@ -24,6 +24,7 @@ export function Cadastro() {
   const [timeCoracao, setTimeCoracao] = useState('');
   const [foto, setFoto] = useState<File | null>(null);
   const [previa, setPrevia] = useState<string | null>(null);
+  const [recortar, setRecortar] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
@@ -58,8 +59,8 @@ export function Cadastro() {
     try {
       await cadastrar(parsed.data);
       try {
-        setEtapa('Enviando foto…');
-        await enviarFoto(foto);
+        setEtapa(recortar ? 'Recortando a foto…' : 'Enviando foto…');
+        await enviarFoto(foto, { recortar });
       } catch {
         setAviso('Conta criada, mas a foto não subiu. Tente de novo no Perfil.');
       }
@@ -101,9 +102,18 @@ export function Cadastro() {
                 </svg>
               </span>
             </button>
-            <div className="text-sm">
+            <div className="min-w-0 flex-1 text-sm">
               <p className="font-semibold text-tinta">Foto de perfil</p>
               <p className="text-xs text-tinta-faint">Obrigatória. JPEG, PNG ou WebP.</p>
+              <label className="mt-1.5 flex cursor-pointer items-center gap-2 text-xs text-tinta-soft">
+                <input
+                  type="checkbox"
+                  checked={recortar}
+                  onChange={(e) => setRecortar(e.target.checked)}
+                  className="h-4 w-4 shrink-0 accent-campo-600"
+                />
+                Recortar o fundo (estilo card)
+              </label>
             </div>
             <input
               ref={fileRef}

@@ -19,6 +19,7 @@ export function Perfil() {
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [fotoEtapa, setFotoEtapa] = useState<string | null>(null);
+  const [recortar, setRecortar] = useState(true);
 
   async function salvar() {
     setSalvando(true);
@@ -40,11 +41,17 @@ export function Perfil() {
   async function trocarFoto(f: File) {
     setMsg(null);
     try {
-      setFotoEtapa('Enviando…');
-      await enviarFoto(f);
+      setFotoEtapa(recortar ? 'Recortando…' : 'Enviando…');
+      const { recortada } = await enviarFoto(f, { recortar });
       setFotoEtapa(null);
       await recarregar();
-      setMsg({ tipo: 'ok', texto: 'Foto atualizada.' });
+      setMsg({
+        tipo: 'ok',
+        texto:
+          recortar && !recortada
+            ? 'Foto atualizada — não deu pra recortar o fundo desta imagem.'
+            : 'Foto atualizada.',
+      });
     } catch (e) {
       setFotoEtapa(null);
       setMsg({ tipo: 'erro', texto: e instanceof ApiError ? e.message : 'Falha ao enviar a foto.' });
@@ -89,11 +96,20 @@ export function Perfil() {
             )}
           </span>
         </button>
-        <div>
+        <div className="min-w-0 flex-1">
           <p className="font-display font-semibold uppercase tracking-[0.02em]">{usuario?.nome}</p>
           <p className="text-sm text-tinta-faint">
             {fotoEtapa ?? formatarTelefone(usuario?.telefone ?? '')}
           </p>
+          <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-tinta-soft">
+            <input
+              type="checkbox"
+              checked={recortar}
+              onChange={(e) => setRecortar(e.target.checked)}
+              className="h-4 w-4 shrink-0 accent-campo-600"
+            />
+            Recortar o fundo (estilo card)
+          </label>
         </div>
         <input
           ref={fileRef}
