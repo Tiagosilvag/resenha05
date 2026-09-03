@@ -1,46 +1,78 @@
-name: Android (AAB)
+name: APK Android
 
-# Manual — precisa dos secrets de assinatura configurados e da pasta
-# apps/web/android/ commitada (gerada por `npx cap add android`).
+# Gera o APK do app (shell Capacitor que abre resenha05.coffetech.com.br).
+# Roda no botão "Run workflow" ou ao empurrar uma tag `apk-*`.
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - 'apk-*'
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
+
+      - name: Instala dependências
+        run: npm ci
+
+      - name: Build do front
+        run: npm run build -w @resenha05/web
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          java-version: 17
 
-      - run: npm ci
-      - run: npm run build --workspace @resenha05/shared
-      - run: npm run build --workspace @resenha05/web
-      - run: npx --workspace @resenha05/web cap sync android
+      - name: SDK do Android
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
 
-      - name: Restaura a keystore
-        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > apps/web/android/app/upload.keystore
-
-      - name: Build AAB assinado
+      - name: Versão do build
         working-directory: apps/web/android
-        env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          ./gradlew bundleRelease \
-            -Pandroid.injected.signing.store.file=upload.keystore \
-            -Pandroid.injected.signing.store.password="$ANDROID_KEYSTORE_PASSWORD" \
-            -Pandroid.injected.signing.key.alias="$ANDROID_KEY_ALIAS" \
-            -Pandroid.injected.signing.key.password="$ANDROID_KEY_PASSWORD"
+          CODE="${{ github.run_number }}"
+          NAME="1.0.${{ github.run_number }}"
+          sed -i "s/versionCode 1/versionCode ${CODE}/" app/build.gradle
+          sed -i "s/versionName \"1.0\"/versionName \"${NAME}\"/" app/build.gradle
+          echo "APK_NAME=resenha05-${NAME}.apk" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=${NAME}" >> "$GITHUB_ENV"
+
+      - name: Sincroniza o Capacitor
+        working-directory: apps/web
+        run: npx cap sync android
+
+      - name: Monta o APK (debug, auto-assinado)
+        working-directory: apps/web/android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+
+      - name: Renomeia o APK
+        run: cp apps/web/android/app/build/outputs/apk/debug/app-debug.apk "${{ env.APK_NAME }}"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: resenha05-release-aab
-          path: apps/web/android/app/build/outputs/bundle/release/*.aab
+          name: apk
+          path: ${{ env.APK_NAME }}
+          if-no-files-found: error
+
+      - name: Publica no release "apk-latest"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete apk-latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create apk-latest "${{ env.APK_NAME }}" \
+            --title "APK Android (${{ env.VERSION_NAME }})" \
+            --notes "APK de instalação direta (sideload). Build #${{ github.run_number }} — commit ${{ github.sha }}. Abre resenha05.coffetech.com.br." \
+            --prerelease

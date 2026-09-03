@@ -15,10 +15,16 @@ apps/api/dist/
 packages/*/dist/
 
 # Capacitor — as pastas android/ e ios/ (geradas por `npx cap add`) SÃO
-# commitadas (convenção do Capacitor); só os builds delas ficam de fora.
+# commitadas (convenção do Capacitor); só os builds e o que o `cap sync`
+# regenera ficam de fora.
 apps/web/android/app/build/
+apps/web/android/build/
 apps/web/android/.gradle/
+apps/web/android/local.properties
 apps/web/android/app/upload.keystore
+apps/web/android/app/src/main/assets/public/
+apps/web/android/app/src/main/assets/capacitor.config.json
+apps/web/android/app/src/main/assets/capacitor.plugins.json
 apps/web/ios/App/Pods/
 apps/web/ios/App/build/
 apps/web/.capacitor/
