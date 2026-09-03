@@ -14,6 +14,7 @@ export interface SessaoUsuario {
   nome: string | null;
   telefone: string;
   fotoUrl: string | null;
+  fotoRecortada: boolean;
   timeCoracao: string | null;
   telefoneVerificado: boolean;
   organizacoes: OrganizacaoDoUsuario[];

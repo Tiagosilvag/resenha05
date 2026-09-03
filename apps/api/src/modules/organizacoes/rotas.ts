@@ -98,6 +98,7 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
         'p.nome as nome',
         'p.telefone as telefone',
         'p.foto_url as fotoUrl',
+        'p.foto_recortada as fotoRecortada',
         'm.papel as papel',
         'm.estrelas as estrelas',
         'm.ativo as ativo',

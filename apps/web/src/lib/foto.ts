@@ -1,13 +1,15 @@
 import { tokens, ApiError } from './api';
 
-export class FotoIndisponivel extends Error {}
+export type EtapaFoto = 'enviando';
 
-/**
- * Envia a foto de perfil (multipart) para a API, que grava no servidor e
- * atualiza o perfil. Devolve a URL pública da imagem.
- */
-export async function enviarFoto(arquivo: File): Promise<string> {
+/** Envia a foto de perfil (multipart) para a API e devolve a URL pública. */
+export async function enviarFoto(
+  arquivo: File,
+  onEtapa?: (e: EtapaFoto) => void,
+): Promise<{ fotoUrl: string; recortada: boolean }> {
+  onEtapa?.('enviando');
   const fd = new FormData();
+  fd.append('recortada', 'false');
   fd.append('foto', arquivo);
 
   const headers = new Headers();
@@ -18,5 +20,5 @@ export async function enviarFoto(arquivo: File): Promise<string> {
   if (!resp.ok) {
     throw new ApiError(resp.status, (corpo as { erro?: string }).erro ?? 'Falha ao enviar a foto.');
   }
-  return (corpo as { fotoUrl: string }).fotoUrl;
+  return { fotoUrl: (corpo as { fotoUrl: string }).fotoUrl, recortada: false };
 }

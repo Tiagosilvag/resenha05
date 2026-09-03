@@ -180,10 +180,12 @@ export function Avatar({
   src,
   nome,
   size = 40,
+  recortada = false,
 }: {
   src?: string | null;
   nome?: string | null;
   size?: number;
+  recortada?: boolean;
 }) {
   const iniciais = (nome ?? '?')
     .trim()
@@ -192,19 +194,29 @@ export function Avatar({
     .map((p) => p[0]?.toUpperCase())
     .join('');
   const estilo = { width: size, height: size } as const;
-  return src ? (
-    <img
-      src={src}
-      alt={nome ?? ''}
-      style={estilo}
-      className="rounded-full object-cover ring-2 ring-white shadow-sm"
-    />
-  ) : (
+  if (!src) {
+    return (
+      <span
+        style={estilo}
+        className="inline-flex items-center justify-center rounded-full bg-campo-100 font-display text-[0.8rem] font-bold text-campo-700 ring-2 ring-white"
+      >
+        {iniciais}
+      </span>
+    );
+  }
+  return (
     <span
       style={estilo}
-      className="inline-flex items-center justify-center rounded-full bg-campo-100 font-display text-[0.8rem] font-bold text-campo-700 ring-2 ring-white"
+      className={cn(
+        'inline-block overflow-hidden rounded-full ring-2 ring-white shadow-sm',
+        recortada && 'bg-gradient-to-b from-campo-400 to-campo-700',
+      )}
     >
-      {iniciais}
+      <img
+        src={src}
+        alt={nome ?? ''}
+        className={cn('h-full w-full', recortada ? 'object-cover object-top' : 'object-cover')}
+      />
     </span>
   );
 }

@@ -33,7 +33,7 @@ async function orgComum(req: FastifyRequest, alvo: string, preferida?: string): 
 async function montarDados(profileId: string, orgId: string): Promise<DadosCartinha> {
   const p = await db
     .selectFrom('profiles')
-    .select(['id', 'nome', 'foto_url'])
+    .select(['id', 'nome', 'foto_url', 'foto_recortada'])
     .where('id', '=', profileId)
     .executeTakeFirst();
   if (!p) throw erro.naoEncontrado('Jogador não encontrado.');
@@ -74,6 +74,7 @@ async function montarDados(profileId: string, orgId: string): Promise<DadosCarti
     profileId,
     nome: p.nome,
     fotoUrl: p.foto_url,
+    fotoRecortada: p.foto_recortada,
     estrelas: membro?.estrelas ?? 3,
     posicao: (extra?.posicao as DadosCartinha['posicao']) ?? null,
     pePreferido: extra?.pe_preferido ?? null,
@@ -119,7 +120,7 @@ export const rotasCartinha: FastifyPluginAsync = async (app) => {
     const orgId = await orgComum(req, profileId, org);
     const dados = await montarDados(profileId, orgId);
     const chave = `${profileId}-${createHash('sha1')
-      .update(JSON.stringify([dados.fotoUrl, dados.estrelas, dados.posicao, dados.pePreferido, dados.desempenho]))
+      .update(JSON.stringify([dados.fotoUrl, dados.fotoRecortada, dados.estrelas, dados.posicao, dados.pePreferido, dados.desempenho]))
       .digest('hex')
       .slice(0, 12)}`;
     await servirComCache(reply, chave, () => renderCartinhaPng(dados));
@@ -130,7 +131,7 @@ export const rotasCartinha: FastifyPluginAsync = async (app) => {
     const orgId = await orgComum(req, req.usuario.id, org);
     const dados = await montarDados(req.usuario.id, orgId);
     const chave = `${req.usuario.id}-${createHash('sha1')
-      .update(JSON.stringify([dados.fotoUrl, dados.estrelas, dados.posicao, dados.pePreferido, dados.desempenho]))
+      .update(JSON.stringify([dados.fotoUrl, dados.fotoRecortada, dados.estrelas, dados.posicao, dados.pePreferido, dados.desempenho]))
       .digest('hex')
       .slice(0, 12)}`;
     await servirComCache(reply, chave, () => renderCartinhaPng(dados));

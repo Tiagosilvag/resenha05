@@ -27,6 +27,7 @@ export function Cadastro() {
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const [etapa, setEtapa] = useState<string | null>(null);
 
   function escolherFoto(f: File | null) {
     setFoto(f);
@@ -57,15 +58,18 @@ export function Cadastro() {
     try {
       await cadastrar(parsed.data);
       try {
+        setEtapa('Enviando foto…');
         await enviarFoto(foto);
       } catch {
         setAviso('Conta criada, mas a foto não subiu. Tente de novo no Perfil.');
       }
+      setEtapa(null);
       await recarregar();
       nav('/', { replace: true });
     } catch (err) {
       setErro(err instanceof ApiError ? err.message : 'Não foi possível concluir o cadastro.');
       setEnviando(false);
+      setEtapa(null);
     }
   }
 
@@ -137,7 +141,13 @@ export function Cadastro() {
           </Field>
 
           <Button type="submit" disabled={enviando} className="mt-1">
-            {enviando ? <Spinner /> : 'Concluir cadastro'}
+            {enviando ? (
+              <>
+                <Spinner /> {etapa ?? 'Criando conta…'}
+              </>
+            ) : (
+              'Concluir cadastro'
+            )}
           </Button>
         </form>
 

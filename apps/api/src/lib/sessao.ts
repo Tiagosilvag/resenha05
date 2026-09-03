@@ -10,7 +10,15 @@ import { erro } from './erros.js';
 export async function carregarUsuario(profileId: string): Promise<SessaoUsuario> {
   const p = await db
     .selectFrom('profiles')
-    .select(['id', 'nome', 'telefone', 'foto_url', 'time_coracao', 'telefone_verificado_em'])
+    .select([
+      'id',
+      'nome',
+      'telefone',
+      'foto_url',
+      'foto_recortada',
+      'time_coracao',
+      'telefone_verificado_em',
+    ])
     .where('id', '=', profileId)
     .executeTakeFirst();
 
@@ -30,6 +38,7 @@ export async function carregarUsuario(profileId: string): Promise<SessaoUsuario>
     nome: p.nome,
     telefone: p.telefone,
     fotoUrl: p.foto_url,
+    fotoRecortada: p.foto_recortada,
     timeCoracao: p.time_coracao,
     telefoneVerificado: p.telefone_verificado_em != null,
     organizacoes: orgs.map((o) => ({

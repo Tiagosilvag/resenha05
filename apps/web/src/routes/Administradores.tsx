@@ -11,6 +11,7 @@ interface Membro {
   nome: string | null;
   telefone: string;
   fotoUrl: string | null;
+  fotoRecortada: boolean;
   papel: 'jogador' | 'admin' | 'admin_principal';
   estrelas: number;
   ativo: boolean;
@@ -73,7 +74,7 @@ export function Administradores() {
         {filtrados.map((m) => (
           <Card key={m.profileId}>
             <div className="flex items-center gap-3">
-              <Avatar src={m.fotoUrl} nome={m.nome} />
+              <Avatar src={m.fotoUrl} nome={m.nome} recortada={m.fotoRecortada} />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold">{m.nome ?? 'Sem nome'}</p>
                 <p className="text-xs text-tinta-faint">{formatarTelefone(m.telefone)}</p>

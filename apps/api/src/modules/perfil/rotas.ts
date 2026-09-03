@@ -85,12 +85,17 @@ export const rotasPerfil: FastifyPluginAsync = async (app) => {
   });
 
   // Fase 1 — upload de foto: multipart direto, gravado num volume do servidor.
+  // Campo opcional `recortada=true` quando o navegador já tirou o fundo (FUT).
   app.post('/perfil/foto', async (req) => {
     const arquivo = await req.file({ limits: { fileSize: TAM_MAX } });
     if (!arquivo) throw erro.invalido('Envie uma imagem no campo "foto".');
 
     const ext = extPara(arquivo.mimetype);
     if (!ext) throw erro.invalido('Formato inválido. Use JPEG, PNG ou WebP.');
+
+    const recortada =
+      (arquivo.fields.recortada as { value?: string } | undefined)?.value === 'true' &&
+      arquivo.mimetype === 'image/png';
 
     let dados: Buffer;
     try {
@@ -103,9 +108,9 @@ export const rotasPerfil: FastifyPluginAsync = async (app) => {
     const fotoUrl = await salvarAvatar(req.usuario.id, dados, ext);
     await db
       .updateTable('profiles')
-      .set({ foto_url: fotoUrl })
+      .set({ foto_url: fotoUrl, foto_recortada: recortada })
       .where('id', '=', req.usuario.id)
       .execute();
-    return { fotoUrl };
+    return { fotoUrl, recortada };
   });
 };

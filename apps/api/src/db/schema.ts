@@ -9,6 +9,7 @@ export interface ProfilesTable {
   senha_hash: string;
   telefone_verificado_em: Timestamp | null;
   foto_url: string | null;
+  foto_recortada: Generated<boolean>;
   time_coracao: string | null;
   created_at: Generated<Timestamp>;
   atualizado_em: Generated<Timestamp>;

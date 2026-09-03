@@ -18,6 +18,7 @@ export function Perfil() {
   const [timeCoracao, setTimeCoracao] = useState(usuario?.timeCoracao ?? '');
   const [msg, setMsg] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [fotoEtapa, setFotoEtapa] = useState<string | null>(null);
 
   async function salvar() {
     setSalvando(true);
@@ -39,10 +40,13 @@ export function Perfil() {
   async function trocarFoto(f: File) {
     setMsg(null);
     try {
+      setFotoEtapa('Enviando…');
       await enviarFoto(f);
+      setFotoEtapa(null);
       await recarregar();
       setMsg({ tipo: 'ok', texto: 'Foto atualizada.' });
     } catch (e) {
+      setFotoEtapa(null);
       setMsg({ tipo: 'erro', texto: e instanceof ApiError ? e.message : 'Falha ao enviar a foto.' });
     }
   }
@@ -69,16 +73,27 @@ export function Perfil() {
           onClick={() => fileRef.current?.click()}
           className="relative rounded-full transition-transform active:scale-95"
         >
-          <Avatar src={usuario?.fotoUrl} nome={usuario?.nome} size={64} />
+          <Avatar
+            src={usuario?.fotoUrl}
+            nome={usuario?.nome}
+            size={64}
+            recortada={usuario?.fotoRecortada}
+          />
           <span className="absolute -bottom-1 -right-1 grid h-6 w-6 place-items-center rounded-full bg-campo-600 text-white ring-2 ring-white">
-            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M4 7h3l2-2h6l2 2h3v12H4z" /><circle cx="12" cy="13" r="3.2" />
-            </svg>
+            {fotoEtapa ? (
+              <Spinner className="h-3 w-3" />
+            ) : (
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M4 7h3l2-2h6l2 2h3v12H4z" /><circle cx="12" cy="13" r="3.2" />
+              </svg>
+            )}
           </span>
         </button>
         <div>
           <p className="font-display font-semibold uppercase tracking-[0.02em]">{usuario?.nome}</p>
-          <p className="text-sm text-tinta-faint">{formatarTelefone(usuario?.telefone ?? '')}</p>
+          <p className="text-sm text-tinta-faint">
+            {fotoEtapa ?? formatarTelefone(usuario?.telefone ?? '')}
+          </p>
         </div>
         <input
           ref={fileRef}

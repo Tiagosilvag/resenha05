@@ -202,6 +202,7 @@ export const rotasPeladas: FastifyPluginAsync = async (app) => {
           'pr.profile_id as profileId',
           'p.nome as nome',
           'p.foto_url as fotoUrl',
+          'p.foto_recortada as fotoRecortada',
           'pr.status as status',
           'pr.confirmado_em as confirmadoEm',
           'm.estrelas as estrelas',

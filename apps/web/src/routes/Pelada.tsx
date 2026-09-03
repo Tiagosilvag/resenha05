@@ -10,6 +10,7 @@ interface Presenca {
   profileId: string;
   nome: string | null;
   fotoUrl: string | null;
+  fotoRecortada: boolean;
   status: 'confirmado' | 'pago' | 'desistiu';
   estrelas: number | null;
 }
@@ -114,7 +115,7 @@ export function Pelada() {
                 className="flex min-w-0 flex-1 items-center gap-3 text-left"
                 onClick={() => setVerCard({ id: p.profileId, nome: p.nome })}
               >
-                <Avatar src={p.fotoUrl} nome={p.nome} size={34} />
+                <Avatar src={p.fotoUrl} nome={p.nome} size={34} recortada={p.fotoRecortada} />
                 <span className="min-w-0">
                   <span className={`block truncate text-sm font-medium ${p.status === 'desistiu' ? 'line-through' : ''}`}>
                     {p.nome ?? 'Jogador'}
