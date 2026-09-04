@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
-  ATRIBUTOS,
+  ATRIBUTOS_CARTA,
   ROTULO_ATRIBUTO,
   calcularAtributos,
   selo,
@@ -48,13 +48,88 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
   const pe = seloPe(dados.pePreferido);
   const estrelas = Math.min(5, Math.max(1, Math.round(dados.estrelas || 3)));
 
-  const stat = (a: (typeof ATRIBUTOS)[number]): El =>
+  const stat = (a: (typeof ATRIBUTOS_CARTA)[number]): El =>
     h(
       'div',
-      { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', width: '33%' } },
+      { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', width: '25%' } },
       h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 24, color: OURO, letterSpacing: 2 } }, ROTULO_ATRIBUTO[a]),
-      h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 800, fontSize: 52, color: CRE, lineHeight: 1 } }, String(at[a])),
+      h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 800, fontSize: 54, color: CRE, lineHeight: 1 } }, String(at[a])),
     );
+
+  const camadaAbsoluta = (...filhos: El[]): El =>
+    h(
+      'div',
+      { style: { position: 'absolute', top: 0, left: 0, width: L, height: A, display: 'flex' } },
+      ...filhos,
+    );
+
+  // Detalhes do fundo — ficam atrás da foto (que, recortada, é transparente
+  // em volta do jogador) para a carta não ficar num vazio chapado.
+  const fundoDetalhes: El = camadaAbsoluta(
+    // anéis de "holofote" atrás do jogador
+    ...[
+      { d: 604, x: 58, y: 150, cor: 'rgba(231,193,88,0.11)' },
+      { d: 430, x: 145, y: 237, cor: 'rgba(231,193,88,0.07)' },
+    ].map(({ d, x, y, cor }) =>
+      h('div', {
+        style: {
+          position: 'absolute',
+          display: 'flex',
+          left: x,
+          top: y,
+          width: d,
+          height: d,
+          borderRadius: d / 2,
+          border: `2px solid ${cor}`,
+        },
+      }),
+    ),
+    // faixas diagonais, no mesmo espírito do fundo do app
+    ...Array.from({ length: 9 }, (_, i) =>
+      h('div', {
+        style: {
+          position: 'absolute',
+          display: 'flex',
+          left: -250 + i * 118,
+          top: -300,
+          width: 36,
+          height: 1620,
+          transform: 'rotate(-22deg)',
+          backgroundColor: i % 2 === 0 ? 'rgba(231,193,88,0.055)' : 'rgba(231,193,88,0.025)',
+        },
+      }),
+    ),
+    // brasão em marca d'água
+    h('img', {
+      src: logo,
+      style: { position: 'absolute', left: 162, top: 232, width: 396, height: 594, opacity: 0.035 },
+    }),
+  );
+
+  // Cantoneiras douradas por cima de tudo — moldura dupla, sem cobrir a foto.
+  const cantoneiras: El = camadaAbsoluta(
+    ...(
+      [
+        { top: 26, left: 26, lados: { borderTop: true, borderLeft: true } },
+        { top: 26, right: 26, lados: { borderTop: true, borderRight: true } },
+        { bottom: 26, left: 26, lados: { borderBottom: true, borderLeft: true } },
+        { bottom: 26, right: 26, lados: { borderBottom: true, borderRight: true } },
+      ] as const
+    ).map(({ lados, ...pos }) =>
+      h('div', {
+        style: {
+          position: 'absolute',
+          display: 'flex',
+          width: 58,
+          height: 58,
+          ...pos,
+          ...Object.fromEntries(
+            Object.keys(lados).map((lado) => [lado, '3px solid rgba(231,193,88,0.45)']),
+          ),
+        },
+      }),
+    ),
+  );
 
   // Foto: recortada = jogador "saindo" da moldura (estilo FUT), preenchendo
   // a carta atrás dos números; senão = janela grande se fundindo à carta.
@@ -97,9 +172,9 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
             bottom: 0,
             left: 0,
             width: L - 12,
-            height: 560,
+            height: 500,
             backgroundImage:
-              'linear-gradient(to top, #0b0b0c 0%, rgba(11,11,12,0.98) 22%, rgba(11,11,12,0.78) 44%, rgba(11,11,12,0.35) 70%, rgba(11,11,12,0) 100%)',
+              'linear-gradient(to top, #0b0b0c 0%, rgba(11,11,12,0.97) 24%, rgba(11,11,12,0.72) 48%, rgba(11,11,12,0.3) 74%, rgba(11,11,12,0) 100%)',
           },
         }),
       )
@@ -203,9 +278,8 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
       h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 800, fontSize: 54, color: OURO, textAlign: 'center', lineHeight: 1 } }, nome),
       h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 20, color: DIM, letterSpacing: 3, marginTop: 6 } }, 'RESENHA 05'),
     ),
-    h('div', { style: { display: 'flex', width: 440, height: 3, backgroundColor: OURO_ESCURO, marginTop: 16, marginBottom: 14 } }),
-    h('div', { style: { display: 'flex', width: '100%', justifyContent: 'space-between', marginBottom: 20 } }, ...ATRIBUTOS.slice(0, 3).map(stat)),
-    h('div', { style: { display: 'flex', width: '100%', justifyContent: 'space-between' } }, ...ATRIBUTOS.slice(3).map(stat)),
+    h('div', { style: { display: 'flex', width: 540, height: 3, backgroundColor: OURO_ESCURO, marginTop: 16, marginBottom: 14 } }),
+    h('div', { style: { display: 'flex', width: 540, justifyContent: 'space-between', marginBottom: 24 } }, ...ATRIBUTOS_CARTA.map(stat)),
     rodape,
   ];
 
@@ -227,8 +301,8 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
   );
 
   const arvore = recortada
-    ? bloco([camadaFoto, conteudoRecortado])
-    : bloco([topo, camadaFoto, ...infoInferior]);
+    ? bloco([fundoDetalhes, camadaFoto, conteudoRecortado, cantoneiras])
+    : bloco([fundoDetalhes, topo, camadaFoto, ...infoInferior, cantoneiras]);
 
   return elementoParaPng(arvore, { width: L, height: A });
 }

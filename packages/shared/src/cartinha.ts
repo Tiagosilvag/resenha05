@@ -10,6 +10,13 @@ export type Posicao = 'goleiro' | 'zagueiro' | 'lateral' | 'meio' | 'atacante';
 export const ATRIBUTOS = ['rit', 'tir', 'pas', 'dri', 'def', 'fis'] as const;
 export type Atributo = (typeof ATRIBUTOS)[number];
 
+/**
+ * Atributos exibidos na arte da cartinha — só 4, em uma única fileira, para
+ * não cobrir a foto do jogador (os 6 continuam sendo calculados e pesam no
+ * overall).
+ */
+export const ATRIBUTOS_CARTA: readonly Atributo[] = ['rit', 'tir', 'pas', 'def'];
+
 export const ROTULO_ATRIBUTO: Record<Atributo, string> = {
   rit: 'RIT',
   tir: 'TIR',
