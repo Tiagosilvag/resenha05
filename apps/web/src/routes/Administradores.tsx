@@ -27,6 +27,8 @@ export function Administradores() {
 
   const vinculo = usuario?.organizacoes.find((o) => o.id === orgId);
   const souDono = vinculo?.papel === 'admin_principal';
+  const linkConvite = `${window.location.origin}/entrar-org/${orgId}`;
+  const [copiado, setCopiado] = useState(false);
 
   const { data: membros, isLoading } = useQuery({
     queryKey: ['membros', orgId],
@@ -67,6 +69,30 @@ export function Administradores() {
         </p>
       </div>
       {erro && <Aviso tipo="erro">{erro}</Aviso>}
+
+      <Card>
+        <p className="eyebrow mb-1">Convidar jogador</p>
+        <p className="mb-3 text-sm text-tinta-soft">
+          Compartilhe este link. Quem abrir e estiver logado entra direto na organização.
+        </p>
+        <div className="flex items-center gap-2">
+          <Input readOnly value={linkConvite} onFocus={(e) => e.target.select()} />
+          <Button
+            variante="secundario"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(linkConvite);
+              } catch {
+                /* alguns navegadores exigem seleção manual; o campo já fica selecionado ao focar */
+              }
+              setCopiado(true);
+              setTimeout(() => setCopiado(false), 2000);
+            }}
+          >
+            {copiado ? 'Copiado!' : 'Copiar'}
+          </Button>
+        </div>
+      </Card>
 
       <Input placeholder="Buscar por nome ou telefone" value={busca} onChange={(e) => setBusca(e.target.value)} />
 
