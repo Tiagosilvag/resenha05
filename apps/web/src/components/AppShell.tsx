@@ -43,7 +43,9 @@ function SeletorOrg({ className, escuro = false }: { className?: string; escuro?
     if (resto !== null) nav(`/org/${novo}${resto}`, { replace: true });
   }
 
-  if (orgs.length < 2) return null;
+  // Na Início as organizações já aparecem listadas no conteúdo — o seletor no
+  // topo só repetiria a escolha ali.
+  if (loc.pathname === '/' || orgs.length < 2) return null;
   return (
     <div className={`relative ${className ?? ''}`}>
       <select
