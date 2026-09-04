@@ -14,13 +14,33 @@
   body {
     margin: 0;
     background-color: theme('colors.gramado.bg');
-    background-image: theme('backgroundImage.gramada');
     color: theme('colors.tinta.DEFAULT');
     font-family: theme('fontFamily.sans');
     font-size: 16px;
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+  }
+
+  /* Marca d'água — brasão fixo no fundo, atrás de todo o conteúdo.
+     Elemento próprio (não background do body) pra ficar mesmo no fundo. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-color: theme('colors.gramado.bg');
+    background-image:
+      url('/marca.webp'),
+      theme('backgroundImage.gramada');
+    background-repeat: no-repeat, repeat;
+    background-position:
+      center 40%,
+      0 0;
+    background-size:
+      min(78vw, 460px) auto,
+      auto;
   }
 
   h1,
