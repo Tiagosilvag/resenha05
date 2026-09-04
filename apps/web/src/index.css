@@ -32,7 +32,7 @@
     pointer-events: none;
     background-color: theme('colors.gramado.bg');
     background-image:
-      url('/marca.webp'),
+      url('./assets/marca.webp'),
       theme('backgroundImage.gramada');
     background-repeat: no-repeat, repeat;
     background-position:
