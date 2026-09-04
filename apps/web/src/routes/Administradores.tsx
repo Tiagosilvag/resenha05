@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { formatarTelefone, mascararTelefone } from '@resenha05/shared';
+import { formatarTelefone } from '@resenha05/shared';
 import { useAuth } from '../lib/auth';
 import { api, ApiError } from '../lib/api';
 import { Avatar, Aviso, Button, Card, Estrelas, Input, Spinner } from '../components/ui';
@@ -17,6 +17,14 @@ interface Membro {
   ativo: boolean;
 }
 
+interface PerfilEncontrado {
+  profileId: string;
+  nome: string | null;
+  telefone: string;
+  fotoUrl: string | null;
+  fotoRecortada: boolean;
+}
+
 export function Administradores() {
   const { orgId = '' } = useParams();
   const { usuario, recarregar } = useAuth();
@@ -24,8 +32,14 @@ export function Administradores() {
   const qc = useQueryClient();
   const [busca, setBusca] = useState('');
   const [erro, setErro] = useState<string | null>(null);
-  const [telefoneNovo, setTelefoneNovo] = useState('');
+  const [termoAdicionar, setTermoAdicionar] = useState('');
+  const [termoDebounced, setTermoDebounced] = useState('');
   const [okAdicionar, setOkAdicionar] = useState<string | null>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setTermoDebounced(termoAdicionar.trim()), 300);
+    return () => clearTimeout(t);
+  }, [termoAdicionar]);
 
   const vinculo = usuario?.organizacoes.find((o) => o.id === orgId);
   const souDono = vinculo?.papel === 'admin_principal';
@@ -37,6 +51,13 @@ export function Administradores() {
     queryKey: ['membros', orgId],
     queryFn: () => api<Membro[]>(`/organizacoes/${orgId}/membros`),
     enabled: Boolean(orgId),
+  });
+
+  const buscaPerfis = useQuery({
+    queryKey: ['buscar-perfis', orgId, termoDebounced],
+    queryFn: () =>
+      api<PerfilEncontrado[]>(`/organizacoes/${orgId}/membros/buscar?q=${encodeURIComponent(termoDebounced)}`),
+    enabled: souAdmin && termoDebounced.length >= 2,
   });
 
   const promover = useMutation({
@@ -53,13 +74,15 @@ export function Administradores() {
   });
 
   const adicionar = useMutation({
-    mutationFn: (v: { telefone: string }) =>
+    mutationFn: (v: { profileId: string }) =>
       api(`/organizacoes/${orgId}/membros/adicionar`, { method: 'POST', json: v }),
-    onSuccess: () => {
+    onSuccess: (_, v) => {
       qc.invalidateQueries({ queryKey: ['membros', orgId] });
-      setTelefoneNovo('');
+      const nome = buscaPerfis.data?.find((p) => p.profileId === v.profileId)?.nome;
+      setTermoAdicionar('');
+      setTermoDebounced('');
       setErro(null);
-      setOkAdicionar('Jogador adicionado!');
+      setOkAdicionar(nome ? `${nome} foi adicionado(a)!` : 'Jogador adicionado!');
       setTimeout(() => setOkAdicionar(null), 3000);
     },
     onError: (e) => setErro(e instanceof ApiError ? e.message : 'Não foi possível adicionar.'),
@@ -134,27 +157,44 @@ export function Administradores() {
 
           <p className="eyebrow mb-1 mt-4">Já tem cadastro?</p>
           <p className="mb-3 text-sm text-tinta-soft">
-            Adicione direto pelo telefone da conta que a pessoa já criou.
+            Digite o nome ou telefone da pessoa — ela precisa já ter uma conta.
           </p>
           {okAdicionar && <Aviso tipo="ok">{okAdicionar}</Aviso>}
-          <form
-            className="flex items-center gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              adicionar.mutate({ telefone: telefoneNovo });
-            }}
-          >
+          <div className="relative">
             <Input
-              inputMode="tel"
-              placeholder="(11) 91234-5678"
-              maxLength={15}
-              value={telefoneNovo}
-              onChange={(e) => setTelefoneNovo(mascararTelefone(e.target.value))}
+              placeholder="Nome ou telefone"
+              value={termoAdicionar}
+              onChange={(e) => setTermoAdicionar(e.target.value)}
             />
-            <Button type="submit" variante="secundario" disabled={adicionar.isPending || !telefoneNovo}>
-              {adicionar.isPending ? <Spinner /> : 'Adicionar'}
-            </Button>
-          </form>
+            {termoDebounced.length >= 2 && (
+              <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-xl border border-tinta-line bg-gramado-raised shadow-pop">
+                {buscaPerfis.isFetching && (
+                  <div className="flex items-center gap-2 px-3 py-2.5 text-sm text-tinta-faint">
+                    <Spinner className="h-4 w-4" /> Buscando…
+                  </div>
+                )}
+                {!buscaPerfis.isFetching && buscaPerfis.data?.length === 0 && (
+                  <p className="px-3 py-2.5 text-sm text-tinta-faint">Nenhum cadastro encontrado.</p>
+                )}
+                {!buscaPerfis.isFetching &&
+                  buscaPerfis.data?.map((p) => (
+                    <button
+                      key={p.profileId}
+                      type="button"
+                      disabled={adicionar.isPending}
+                      className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-campo-50 disabled:opacity-50"
+                      onClick={() => adicionar.mutate({ profileId: p.profileId })}
+                    >
+                      <Avatar src={p.fotoUrl} nome={p.nome} recortada={p.fotoRecortada} size={36} />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold">{p.nome ?? 'Sem nome'}</p>
+                        <p className="text-xs text-tinta-faint">{formatarTelefone(p.telefone)}</p>
+                      </div>
+                    </button>
+                  ))}
+              </div>
+            )}
+          </div>
         </Card>
       )}
 

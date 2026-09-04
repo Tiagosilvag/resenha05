@@ -127,20 +127,49 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
       .execute();
   });
 
-  // Admin adiciona à organização um jogador que já tem cadastro (busca por telefone).
+  // Admin busca (por nome ou telefone) contas já cadastradas para adicionar à organização.
+  app.get('/organizacoes/:id/membros/buscar', async (req) => {
+    const { id } = req.params as { id: string };
+    exigirAdmin(req, id);
+    const q = ((req.query as { q?: string }).q ?? '').trim();
+    if (q.length < 2) return [];
+    const digitos = q.replace(/\D/g, '');
+
+    return db
+      .selectFrom('profiles as p')
+      .leftJoin('organizacao_membros as m', (join) =>
+        join.onRef('m.profile_id', '=', 'p.id').on('m.organizacao_id', '=', id),
+      )
+      .select([
+        'p.id as profileId',
+        'p.nome as nome',
+        'p.telefone as telefone',
+        'p.foto_url as fotoUrl',
+        'p.foto_recortada as fotoRecortada',
+      ])
+      .where('m.profile_id', 'is', null)
+      .where((eb) => {
+        const condicoes = [eb('p.nome', 'ilike', `%${q}%`)];
+        if (digitos.length > 0) condicoes.push(eb('p.telefone', 'like', `%${digitos}%`));
+        return eb.or(condicoes);
+      })
+      .orderBy('p.nome')
+      .limit(6)
+      .execute();
+  });
+
+  // Admin adiciona à organização um jogador que já tem cadastro (escolhido na busca).
   app.post('/organizacoes/:id/membros/adicionar', async (req, reply) => {
     const { id } = req.params as { id: string };
     exigirAdmin(req, id);
-    const { telefone } = validar(adicionarMembroSchema, req.body);
+    const { profileId } = validar(adicionarMembroSchema, req.body);
 
     const perfil = await db
       .selectFrom('profiles')
       .select('id')
-      .where('telefone', '=', telefone)
+      .where('id', '=', profileId)
       .executeTakeFirst();
-    if (!perfil) {
-      throw erro.naoEncontrado('Nenhuma conta encontrada com esse telefone. Peça para a pessoa se cadastrar primeiro.');
-    }
+    if (!perfil) throw erro.naoEncontrado('Conta não encontrada.');
 
     const r = await db
       .insertInto('organizacao_membros')

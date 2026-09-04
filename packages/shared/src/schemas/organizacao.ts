@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { normalizarTelefone, telefoneCelularValido } from '../telefone.js';
 
 export const PAPEIS = ['jogador', 'admin', 'admin_principal'] as const;
 export type Papel = (typeof PAPEIS)[number];
@@ -27,13 +26,7 @@ export const ajustarEstrelasSchema = z.object({
 });
 
 export const adicionarMembroSchema = z.object({
-  telefone: z
-    .string()
-    .trim()
-    .transform(normalizarTelefone)
-    .refine(telefoneCelularValido, {
-      message: 'Digite o número completo com DDD: (XX) XXXXX-XXXX.',
-    }),
+  profileId: z.string().uuid(),
 });
 
 export const removerMembroSchema = z.object({
