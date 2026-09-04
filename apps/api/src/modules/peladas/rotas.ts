@@ -4,6 +4,7 @@ import {
   criarPeladaSchema,
   criarPeladaDaConfigSchema,
   confirmarPresencaSchema,
+  marcarPagamentoSchema,
   mudarStatusPeladaSchema,
 } from '@resenha05/shared';
 import { db } from '../../db/index.js';
@@ -275,6 +276,26 @@ export const rotasPeladas: FastifyPluginAsync = async (app) => {
 
       await db.deleteFrom('peladas').where('id', '=', peladaId).execute();
       reply.code(204);
+    });
+
+    // Admin marca quem já pagou. Desmarcar volta para 'confirmado' — quem
+    // pagou continua na lista de qualquer jeito.
+    r.post('/peladas/:peladaId/pagamento', async (req) => {
+      const { peladaId } = req.params as { peladaId: string };
+      const pelada = await orgDaPelada(req, peladaId);
+      exigirAdmin(req, pelada.organizacao_id);
+      const { profileId, pago } = validar(marcarPagamentoSchema, req.body);
+
+      const atualizado = await db
+        .updateTable('presencas')
+        .set({ status: pago ? 'pago' : 'confirmado' })
+        .where('pelada_id', '=', peladaId)
+        .where('profile_id', '=', profileId)
+        .executeTakeFirst();
+      if (atualizado.numUpdatedRows === 0n) {
+        throw erro.naoEncontrado('Esse jogador não está na lista desta pelada.');
+      }
+      return { ok: true };
     });
 
     r.post('/peladas/:peladaId/status', async (req) => {

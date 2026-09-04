@@ -42,6 +42,12 @@ export const confirmarPresencaSchema = z.object({
   status: z.enum(['confirmado', 'desistiu']).optional(),
 });
 
+/** Admin marca/desmarca quem já pagou a pelada. */
+export const marcarPagamentoSchema = z.object({
+  profileId: z.string().uuid(),
+  pago: z.boolean(),
+});
+
 export const mudarStatusPeladaSchema = z.object({
   status: z.enum(['aberta', 'fechada', 'realizada', 'cancelada']),
 });

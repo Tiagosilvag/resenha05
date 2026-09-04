@@ -51,6 +51,14 @@ export function Pelada() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['pelada', peladaId] }),
     onError: (e) => setErro(e instanceof ApiError ? e.message : 'Erro.'),
   });
+  const pagamento = useMutation({
+    mutationFn: (v: { profileId: string; pago: boolean }) =>
+      api(`/peladas/${peladaId}/pagamento`, { method: 'POST', json: v }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['pelada', peladaId] }),
+    onError: (e) =>
+      setErro(e instanceof ApiError ? e.message : 'Não foi possível mudar o pagamento.'),
+  });
+
   const sairDaLista = useMutation({
     mutationFn: () => api(`/peladas/${peladaId}/presenca`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['pelada', peladaId] }),
@@ -105,6 +113,11 @@ export function Pelada() {
 
       <section>
         <Eyebrow>Lista de presença</Eyebrow>
+        {admin && (
+          <p className="-mt-1 mb-2 text-xs text-tinta-faint">
+            Toque no status de um jogador para marcar que ele pagou.
+          </p>
+        )}
         <div className="divide-y divide-tinta-line/60 overflow-hidden rounded-2xl border border-tinta-line/70 bg-gramado-raised">
           {data.presencas.map((p, i) => (
             <div
@@ -125,7 +138,25 @@ export function Pelada() {
                   {p.estrelas != null && <Estrelas n={p.estrelas} className="mt-0.5" />}
                 </span>
               </button>
-              <Chip tom={p.status}>{p.status}</Chip>
+              {admin && p.status !== 'desistiu' ? (
+                <button
+                  type="button"
+                  disabled={pagamento.isPending}
+                  aria-label={
+                    p.status === 'pago'
+                      ? `Marcar ${p.nome ?? 'jogador'} como não pago`
+                      : `Marcar ${p.nome ?? 'jogador'} como pago`
+                  }
+                  onClick={() =>
+                    pagamento.mutate({ profileId: p.profileId, pago: p.status !== 'pago' })
+                  }
+                  className="shrink-0 rounded-full ring-offset-2 ring-offset-gramado-raised transition-transform hover:ring-1 hover:ring-campo-300 active:scale-95 disabled:opacity-50"
+                >
+                  <Chip tom={p.status}>{p.status}</Chip>
+                </button>
+              ) : (
+                <Chip tom={p.status}>{p.status}</Chip>
+              )}
             </div>
           ))}
           {data.presencas.length === 0 && (
