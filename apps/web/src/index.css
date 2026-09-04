@@ -60,6 +60,27 @@
     font-family: inherit;
   }
 
+  /* Campos de data/hora: no iOS (todos os navegadores usam WebKit) o controle
+     nativo mantém a largura intrínseca dele e vaza para fora do card, mesmo
+     com width:100%. `appearance:none` devolve o controle da caixa pro CSS. */
+  input[type='time'],
+  input[type='date'],
+  input[type='datetime-local'] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* O WebKit centraliza o valor e ainda lhe dá margem própria — alinha os
+     campos de hora com os demais. */
+  input[type='time']::-webkit-date-and-time-value,
+  input[type='date']::-webkit-date-and-time-value,
+  input[type='datetime-local']::-webkit-date-and-time-value {
+    margin: 0;
+    text-align: left;
+  }
+
   /* Foco visível e consistente em tudo que é interativo. */
   :focus-visible {
     outline: 2px solid theme('colors.campo.500');
