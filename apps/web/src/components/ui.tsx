@@ -33,8 +33,10 @@ export function Button({
 
 /* ── Campos ───────────────────────────────────────────────────────────────── */
 // text-base (16px): abaixo disso o Safari/Chrome no mobile dá zoom automático ao focar o campo.
+// min-w-0: sem isso o input[type=time] no mobile impõe a largura intrínseca
+// dele e vaza para fora do card (itens de flex/grid nascem com min-width:auto).
 const campoBase =
-  'w-full rounded-xl border border-tinta-line bg-gramado-raised px-3.5 py-2.5 text-base text-tinta outline-none transition-colors placeholder:text-tinta-faint/70 focus:border-campo-400 focus:ring-4 focus:ring-campo-100';
+  'w-full min-w-0 rounded-xl border border-tinta-line bg-gramado-raised px-3.5 py-2.5 text-base text-tinta outline-none transition-colors placeholder:text-tinta-faint/70 focus:border-campo-400 focus:ring-4 focus:ring-campo-100';
 
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={cn(campoBase, className)} {...props} />;
@@ -69,7 +71,7 @@ export function Field({
   children: ReactNode;
 }) {
   return (
-    <label className="block">
+    <label className="block min-w-0">
       <span className="mb-1.5 block font-display text-[0.82rem] font-semibold uppercase tracking-[0.06em] text-tinta-soft">
         {label}
       </span>

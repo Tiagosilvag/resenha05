@@ -41,6 +41,16 @@ export function Peladas() {
     enabled: Boolean(orgId),
   });
 
+  const excluirConfig = useMutation({
+    mutationFn: (configId: string) => api(`/configuracoes/${configId}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['configs', orgId] });
+      setErro(null);
+    },
+    onError: (e) =>
+      setErro(e instanceof ApiError ? e.message : 'Não foi possível excluir a configuração.'),
+  });
+
   const gerar = useMutation({
     mutationFn: (configId: string) =>
       api<{ id: string }>('/peladas/da-config', { method: 'POST', json: { configId } }),
@@ -103,9 +113,24 @@ export function Peladas() {
                 </p>
               </div>
               {admin && (
-                <Button variante="secundario" onClick={() => gerar.mutate(c.id)} disabled={gerar.isPending}>
-                  {gerar.isPending ? <Spinner /> : 'Gerar'}
-                </Button>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Button variante="secundario" onClick={() => gerar.mutate(c.id)} disabled={gerar.isPending}>
+                    {gerar.isPending ? <Spinner /> : 'Gerar'}
+                  </Button>
+                  <button
+                    type="button"
+                    aria-label={`Excluir a configuração ${c.nome}`}
+                    className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-barro-100 text-barro-600 transition-colors hover:bg-barro-100/50"
+                    onClick={() => {
+                      if (!confirm(`Excluir a configuração "${c.nome}"? As peladas já geradas continuam.`)) return;
+                      excluirConfig.mutate(c.id);
+                    }}
+                  >
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 7h16M9 7V5h6v2m-9 0 1 13h10l1-13" />
+                    </svg>
+                  </button>
+                </div>
               )}
             </Card>
           ))}

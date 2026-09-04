@@ -10,7 +10,7 @@ import { db } from '../../db/index.js';
 import { env } from '../../env.js';
 import { validar } from '../../lib/validar.js';
 import { erro } from '../../lib/erros.js';
-import { exigirAdmin, exigirMembro } from '../../plugins/auth.js';
+import { exigirAdmin, exigirDono, exigirMembro } from '../../plugins/auth.js';
 
 /** Descobre a organização de uma pelada e confirma que o usuário é membro. */
 async function orgDaPelada(req: FastifyRequest, peladaId: string) {
@@ -152,6 +152,16 @@ export const rotasPeladas: FastifyPluginAsync = async (app) => {
       return { ok: true };
     });
 
+    // Apaga a configuração recorrente. As peladas já geradas ficam de pé —
+    // a FK usa `on delete set null` no config_id.
+    r.delete('/configuracoes/:configId', async (req, reply) => {
+      const { configId } = req.params as { configId: string };
+      const orgId = await orgDaConfig(configId);
+      exigirAdmin(req, orgId);
+      await db.deleteFrom('pelada_configuracoes').where('id', '=', configId).execute();
+      reply.code(204);
+    });
+
     r.post('/organizacoes/:id/peladas', async (req, reply) => {
       const { id } = req.params as { id: string };
       exigirAdmin(req, id);
@@ -243,6 +253,27 @@ export const rotasPeladas: FastifyPluginAsync = async (app) => {
         .where('pelada_id', '=', peladaId)
         .where('profile_id', '=', req.usuario.id)
         .execute();
+      reply.code(204);
+    });
+
+    // Só o dono apaga uma pelada, e só enquanto ninguém tiver pago — depois
+    // disso o caminho é cancelar (o histórico do pagamento tem que sobreviver).
+    r.delete('/peladas/:peladaId', async (req, reply) => {
+      const { peladaId } = req.params as { peladaId: string };
+      const pelada = await orgDaPelada(req, peladaId);
+      exigirDono(req, pelada.organizacao_id);
+
+      const pago = await db
+        .selectFrom('presencas')
+        .select('profile_id')
+        .where('pelada_id', '=', peladaId)
+        .where('status', '=', 'pago')
+        .executeTakeFirst();
+      if (pago) {
+        throw erro.conflito('Alguém já pagou esta pelada. Cancele a pelada em vez de excluir.');
+      }
+
+      await db.deleteFrom('peladas').where('id', '=', peladaId).execute();
       reply.code(204);
     });
 

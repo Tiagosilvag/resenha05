@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../lib/auth';
 import { api, ApiError, baixarPng } from '../lib/api';
@@ -30,6 +30,7 @@ interface PeladaResp {
 export function Pelada() {
   const { peladaId = '' } = useParams();
   const { usuario } = useAuth();
+  const nav = useNavigate();
   const qc = useQueryClient();
   const [erro, setErro] = useState<string | null>(null);
   const [verCard, setVerCard] = useState<{ id: string; nome: string | null } | null>(null);
@@ -41,7 +42,8 @@ export function Pelada() {
   });
 
   const org = usuario?.organizacoes.find((o) => o.id === data?.pelada.organizacao_id);
-  const admin = org?.papel === 'admin' || org?.papel === 'admin_principal';
+  const souDono = org?.papel === 'admin_principal';
+  const admin = souDono || org?.papel === 'admin';
 
   const confirmar = useMutation({
     mutationFn: (status: 'confirmado' | 'desistiu') =>
@@ -138,6 +140,26 @@ export function Pelada() {
           orgId={data.pelada.organizacao_id}
           confirmados={confirmados.length}
         />
+      )}
+
+      {souDono && (
+        <Card>
+          <button
+            className="w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-barro-600 hover:bg-barro-100/50"
+            onClick={async () => {
+              if (!confirm('Excluir esta pelada? A lista de presença vai junto.')) return;
+              try {
+                await api(`/peladas/${peladaId}`, { method: 'DELETE' });
+                qc.invalidateQueries({ queryKey: ['peladas', data.pelada.organizacao_id] });
+                nav('/peladas', { replace: true });
+              } catch (e) {
+                setErro(e instanceof ApiError ? e.message : 'Não foi possível excluir a pelada.');
+              }
+            }}
+          >
+            Excluir pelada
+          </button>
+        </Card>
       )}
 
       {verCard && (
