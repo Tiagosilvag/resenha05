@@ -32,8 +32,9 @@ export function Button({
 }
 
 /* ── Campos ───────────────────────────────────────────────────────────────── */
+// text-base (16px): abaixo disso o Safari/Chrome no mobile dá zoom automático ao focar o campo.
 const campoBase =
-  'w-full rounded-xl border border-tinta-line bg-gramado-raised px-3.5 py-2.5 text-[0.95rem] text-tinta outline-none transition-colors placeholder:text-tinta-faint/70 focus:border-campo-400 focus:ring-4 focus:ring-campo-100';
+  'w-full rounded-xl border border-tinta-line bg-gramado-raised px-3.5 py-2.5 text-base text-tinta outline-none transition-colors placeholder:text-tinta-faint/70 focus:border-campo-400 focus:ring-4 focus:ring-campo-100';
 
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={cn(campoBase, className)} {...props} />;

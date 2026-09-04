@@ -201,69 +201,76 @@ export function Administradores() {
       <Input placeholder="Buscar por nome ou telefone" value={busca} onChange={(e) => setBusca(e.target.value)} />
 
       <div className="flex flex-col gap-2">
-        {filtrados.map((m) => (
-          <Card key={m.profileId}>
-            <div className="flex items-center gap-3">
-              <Avatar src={m.fotoUrl} nome={m.nome} recortada={m.fotoRecortada} />
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold">{m.nome ?? 'Sem nome'}</p>
-                <p className="text-xs text-tinta-faint">{formatarTelefone(m.telefone)}</p>
-              </div>
-              <span className="rounded-md bg-campo-50 px-2 py-0.5 text-xs font-semibold capitalize text-campo-700">
-                {m.papel.replace('_', ' ')}
-              </span>
-            </div>
+        {filtrados.map((m) => {
+          const podePromover = souDono && m.papel !== 'admin_principal';
+          const podeExcluir =
+            souAdmin && m.papel !== 'admin_principal' && m.profileId !== usuario?.id && (m.papel === 'jogador' || souDono);
 
-            <div className="mt-3 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Estrelas n={m.estrelas} />
-                {souAdmin && (
-                  <input
-                    type="range"
-                    min={1}
-                    max={5}
-                    value={m.estrelas}
-                    onChange={(e) =>
-                      estrelas.mutate({ profileId: m.profileId, estrelas: Number(e.target.value) })
-                    }
-                    className="w-24 accent-campo-600"
-                  />
-                )}
+          return (
+            <Card key={m.profileId}>
+              <div className="flex items-center gap-3">
+                <Avatar src={m.fotoUrl} nome={m.nome} recortada={m.fotoRecortada} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold">{m.nome ?? 'Sem nome'}</p>
+                  <p className="text-xs text-tinta-faint">{formatarTelefone(m.telefone)}</p>
+                </div>
+                <span className="rounded-md bg-campo-50 px-2 py-0.5 text-xs font-semibold capitalize text-campo-700">
+                  {m.papel.replace('_', ' ')}
+                </span>
               </div>
 
-              <div className="flex items-center gap-2">
-                {souDono && m.papel !== 'admin_principal' && (
-                  <Button
-                    variante="secundario"
-                    onClick={() =>
-                      promover.mutate({
-                        profileId: m.profileId,
-                        papel: m.papel === 'admin' ? 'jogador' : 'admin',
-                      })
-                    }
-                  >
-                    {m.papel === 'admin' ? 'Rebaixar' : 'Tornar admin'}
-                  </Button>
-                )}
-
-                {souAdmin &&
-                  m.papel !== 'admin_principal' &&
-                  m.profileId !== usuario?.id &&
-                  (m.papel === 'jogador' || souDono) && (
-                    <Button
-                      variante="perigo"
-                      onClick={() => {
-                        if (!confirm(`Remover ${m.nome ?? 'este jogador'} da organização?`)) return;
-                        remover.mutate({ profileId: m.profileId });
-                      }}
-                    >
-                      Excluir
-                    </Button>
+              <div className="mt-3 flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <Estrelas n={m.estrelas} />
+                  {souAdmin && (
+                    <input
+                      type="range"
+                      min={1}
+                      max={5}
+                      value={m.estrelas}
+                      onChange={(e) =>
+                        estrelas.mutate({ profileId: m.profileId, estrelas: Number(e.target.value) })
+                      }
+                      className="w-24 accent-campo-600"
+                    />
                   )}
+                </div>
+
+                {(podePromover || podeExcluir) && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {podePromover && (
+                      <Button
+                        variante="secundario"
+                        className="flex-1 min-w-0 !px-3 !text-[0.85rem]"
+                        onClick={() =>
+                          promover.mutate({
+                            profileId: m.profileId,
+                            papel: m.papel === 'admin' ? 'jogador' : 'admin',
+                          })
+                        }
+                      >
+                        {m.papel === 'admin' ? 'Rebaixar' : 'Tornar admin'}
+                      </Button>
+                    )}
+
+                    {podeExcluir && (
+                      <Button
+                        variante="perigo"
+                        className="flex-1 min-w-0 !px-3 !text-[0.85rem]"
+                        onClick={() => {
+                          if (!confirm(`Remover ${m.nome ?? 'este jogador'} da organização?`)) return;
+                          remover.mutate({ profileId: m.profileId });
+                        }}
+                      >
+                        Excluir
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          );
+        })}
       </div>
 
       {vinculo && !souDono && (

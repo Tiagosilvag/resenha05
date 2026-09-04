@@ -1,8 +1,27 @@
-import type { ComponentType, ReactNode, SVGProps } from 'react';
+import { useEffect, useState, type ComponentType, type ReactNode, type SVGProps } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Logo } from './Logo';
 import { useOrg } from '../lib/org';
+import { cn } from './ui';
 import { IconeInicio, IconeBola, IconeTrofeu, IconePerfil } from './icons';
+
+/**
+ * Com o teclado virtual aberto, `position: fixed` fica instável em muitos
+ * navegadores mobile (o elemento "flutua" fora do lugar). Escondemos a barra
+ * inferior enquanto o teclado ocupa uma fatia grande da tela.
+ */
+function useTecladoAberto() {
+  const [aberto, setAberto] = useState(false);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const verificar = () => setAberto(window.innerHeight - vv.height > 150);
+    vv.addEventListener('resize', verificar);
+    verificar();
+    return () => vv.removeEventListener('resize', verificar);
+  }, []);
+  return aberto;
+}
 
 const ITENS: { to: string; rotulo: string; Icone: ComponentType<SVGProps<SVGSVGElement>>; exact?: boolean }[] = [
   { to: '/', rotulo: 'Início', Icone: IconeInicio, exact: true },
@@ -47,6 +66,7 @@ function SeletorOrg({ className, escuro = false }: { className?: string; escuro?
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const tecladoAberto = useTecladoAberto();
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col md:flex-row">
       {/* Sidebar — desktop */}
@@ -88,8 +108,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="px-4 py-5 md:px-9 md:py-9">{children}</div>
       </main>
 
-      {/* Bottom nav — mobile */}
-      <nav className="safe-bottom fixed inset-x-0 bottom-0 z-20 mx-auto flex max-w-3xl border-t border-campo-500/20 bg-noite/95 backdrop-blur md:hidden">
+      {/* Bottom nav — mobile (escondida com o teclado aberto, ver useTecladoAberto) */}
+      <nav
+        className={cn(
+          'safe-bottom fixed inset-x-0 bottom-0 z-20 mx-auto flex max-w-3xl border-t border-campo-500/20 bg-noite/95 backdrop-blur md:hidden',
+          tecladoAberto && 'hidden',
+        )}
+      >
         {ITENS.map(({ to, rotulo, Icone, exact }) => (
           <NavLink
             key={to}
