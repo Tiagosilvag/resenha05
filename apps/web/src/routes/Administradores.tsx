@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { formatarTelefone } from '@resenha05/shared';
+import { formatarTelefone, mascararTelefone } from '@resenha05/shared';
 import { useAuth } from '../lib/auth';
 import { api, ApiError } from '../lib/api';
 import { Avatar, Aviso, Button, Card, Estrelas, Input, Spinner } from '../components/ui';
@@ -24,6 +24,8 @@ export function Administradores() {
   const qc = useQueryClient();
   const [busca, setBusca] = useState('');
   const [erro, setErro] = useState<string | null>(null);
+  const [telefoneNovo, setTelefoneNovo] = useState('');
+  const [okAdicionar, setOkAdicionar] = useState<string | null>(null);
 
   const vinculo = usuario?.organizacoes.find((o) => o.id === orgId);
   const souDono = vinculo?.papel === 'admin_principal';
@@ -47,6 +49,19 @@ export function Administradores() {
     mutationFn: (v: { profileId: string; estrelas: number }) =>
       api(`/organizacoes/${orgId}/membros/estrelas`, { method: 'POST', json: v }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['membros', orgId] }),
+  });
+
+  const adicionar = useMutation({
+    mutationFn: (v: { telefone: string }) =>
+      api(`/organizacoes/${orgId}/membros/adicionar`, { method: 'POST', json: v }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['membros', orgId] });
+      setTelefoneNovo('');
+      setErro(null);
+      setOkAdicionar('Jogador adicionado!');
+      setTimeout(() => setOkAdicionar(null), 3000);
+    },
+    onError: (e) => setErro(e instanceof ApiError ? e.message : 'Não foi possível adicionar.'),
   });
 
   const filtrados = useMemo(() => {
@@ -92,6 +107,30 @@ export function Administradores() {
             {copiado ? 'Copiado!' : 'Copiar'}
           </Button>
         </div>
+
+        <p className="eyebrow mb-1 mt-4">Já tem cadastro?</p>
+        <p className="mb-3 text-sm text-tinta-soft">
+          Adicione direto pelo telefone da conta que a pessoa já criou.
+        </p>
+        {okAdicionar && <Aviso tipo="ok">{okAdicionar}</Aviso>}
+        <form
+          className="flex items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            adicionar.mutate({ telefone: telefoneNovo });
+          }}
+        >
+          <Input
+            inputMode="tel"
+            placeholder="(11) 91234-5678"
+            maxLength={15}
+            value={telefoneNovo}
+            onChange={(e) => setTelefoneNovo(mascararTelefone(e.target.value))}
+          />
+          <Button type="submit" variante="secundario" disabled={adicionar.isPending || !telefoneNovo}>
+            {adicionar.isPending ? <Spinner /> : 'Adicionar'}
+          </Button>
+        </form>
       </Card>
 
       <Input placeholder="Buscar por nome ou telefone" value={busca} onChange={(e) => setBusca(e.target.value)} />

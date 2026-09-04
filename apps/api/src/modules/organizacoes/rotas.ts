@@ -3,6 +3,7 @@ import {
   criarOrganizacaoSchema,
   promoverMembroSchema,
   ajustarEstrelasSchema,
+  adicionarMembroSchema,
   conectarMercadoPagoSchema,
 } from '@resenha05/shared';
 import { db } from '../../db/index.js';
@@ -107,6 +108,33 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
       .orderBy('m.papel')
       .orderBy('p.nome')
       .execute();
+  });
+
+  // Admin adiciona à organização um jogador que já tem cadastro (busca por telefone).
+  app.post('/organizacoes/:id/membros/adicionar', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    exigirAdmin(req, id);
+    const { telefone } = validar(adicionarMembroSchema, req.body);
+
+    const perfil = await db
+      .selectFrom('profiles')
+      .select('id')
+      .where('telefone', '=', telefone)
+      .executeTakeFirst();
+    if (!perfil) {
+      throw erro.naoEncontrado('Nenhuma conta encontrada com esse telefone. Peça para a pessoa se cadastrar primeiro.');
+    }
+
+    const r = await db
+      .insertInto('organizacao_membros')
+      .values({ organizacao_id: id, profile_id: perfil.id, papel: 'jogador' })
+      .onConflict((oc) => oc.columns(['organizacao_id', 'profile_id']).doNothing())
+      .executeTakeFirst();
+    if (r.numInsertedOrUpdatedRows === 0n) {
+      throw erro.conflito('Esta pessoa já faz parte da organização.');
+    }
+    reply.code(201);
+    return { ok: true };
   });
 
   app.post('/organizacoes/:id/membros/promover', async (req) => {
