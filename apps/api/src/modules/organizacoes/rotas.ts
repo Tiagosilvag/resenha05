@@ -4,6 +4,7 @@ import {
   promoverMembroSchema,
   ajustarEstrelasSchema,
   adicionarMembroSchema,
+  removerMembroSchema,
   conectarMercadoPagoSchema,
 } from '@resenha05/shared';
 import { db } from '../../db/index.js';
@@ -87,10 +88,26 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
     return { ok: true };
   });
 
+  // Membro sai da organização por conta própria (o dono não pode sair — só encerrar).
+  app.post('/organizacoes/:id/sair', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const vinculo = exigirMembro(req, id);
+    if (vinculo.papel === 'admin_principal') {
+      throw erro.invalido('O admin principal não pode sair. Encerre a organização se quiser sair.');
+    }
+    await db
+      .deleteFrom('organizacao_membros')
+      .where('organizacao_id', '=', id)
+      .where('profile_id', '=', req.usuario.id)
+      .execute();
+    reply.code(204);
+  });
+
   // ── Fase 3 — administração ────────────────────────────────────────────────
+  // Qualquer membro pode ver a lista (visualização); ações seguem restritas a admins.
   app.get('/organizacoes/:id/membros', async (req) => {
     const { id } = req.params as { id: string };
-    exigirAdmin(req, id);
+    exigirMembro(req, id);
     return db
       .selectFrom('organizacao_membros as m')
       .innerJoin('profiles as p', 'p.id', 'm.profile_id')
@@ -135,6 +152,35 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
     }
     reply.code(201);
     return { ok: true };
+  });
+
+  // Admin remove um membro da organização (admin comum não remove outro admin).
+  app.post('/organizacoes/:id/membros/remover', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    exigirAdmin(req, id);
+    const { profileId } = validar(removerMembroSchema, req.body);
+    if (profileId === req.usuario.id) {
+      throw erro.invalido('Use a opção "Sair da organização" para remover a si mesmo.');
+    }
+    const alvo = await db
+      .selectFrom('organizacao_membros')
+      .select('papel')
+      .where('organizacao_id', '=', id)
+      .where('profile_id', '=', profileId)
+      .executeTakeFirst();
+    if (!alvo) throw erro.naoEncontrado('Membro não encontrado.');
+    if (alvo.papel === 'admin_principal') {
+      throw erro.proibido('Não é possível remover o admin principal.');
+    }
+    if (alvo.papel === 'admin') {
+      exigirDono(req, id);
+    }
+    await db
+      .deleteFrom('organizacao_membros')
+      .where('organizacao_id', '=', id)
+      .where('profile_id', '=', profileId)
+      .execute();
+    reply.code(204);
   });
 
   app.post('/organizacoes/:id/membros/promover', async (req) => {

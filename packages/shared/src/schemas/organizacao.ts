@@ -36,4 +36,8 @@ export const adicionarMembroSchema = z.object({
     }),
 });
 
+export const removerMembroSchema = z.object({
+  profileId: z.string().uuid(),
+});
+
 export const MAX_ADMINS = 5;

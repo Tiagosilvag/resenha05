@@ -29,6 +29,7 @@ export function Administradores() {
 
   const vinculo = usuario?.organizacoes.find((o) => o.id === orgId);
   const souDono = vinculo?.papel === 'admin_principal';
+  const souAdmin = souDono || vinculo?.papel === 'admin';
   const linkConvite = `${window.location.origin}/entrar-org/${orgId}`;
   const [copiado, setCopiado] = useState(false);
 
@@ -64,6 +65,24 @@ export function Administradores() {
     onError: (e) => setErro(e instanceof ApiError ? e.message : 'Não foi possível adicionar.'),
   });
 
+  const remover = useMutation({
+    mutationFn: (v: { profileId: string }) =>
+      api(`/organizacoes/${orgId}/membros/remover`, { method: 'POST', json: v }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['membros', orgId] }),
+    onError: (e) => setErro(e instanceof ApiError ? e.message : 'Não foi possível remover.'),
+  });
+
+  async function sair() {
+    if (!confirm('Sair desta organização?')) return;
+    try {
+      await api(`/organizacoes/${orgId}/sair`, { method: 'POST' });
+      await recarregar();
+      nav('/', { replace: true });
+    } catch (e) {
+      setErro(e instanceof ApiError ? e.message : 'Não foi possível sair da organização.');
+    }
+  }
+
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
     return (membros ?? []).filter(
@@ -78,60 +97,66 @@ export function Administradores() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="font-display text-2xl font-bold tracking-tight">Administradores</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight">
+          {souAdmin ? 'Administradores' : 'Organização'}
+        </h1>
         <p className="text-sm text-tinta-soft">
-          {totalAdmins}/5 admins. {souDono ? 'Você é o admin principal.' : 'Só o admin principal promove.'}
+          {souAdmin
+            ? `${totalAdmins}/5 admins. ${souDono ? 'Você é o admin principal.' : 'Só o admin principal promove.'}`
+            : `${(membros ?? []).length} membro(s).`}
         </p>
       </div>
       {erro && <Aviso tipo="erro">{erro}</Aviso>}
 
-      <Card>
-        <p className="eyebrow mb-1">Convidar jogador</p>
-        <p className="mb-3 text-sm text-tinta-soft">
-          Compartilhe este link. Quem abrir e estiver logado entra direto na organização.
-        </p>
-        <div className="flex items-center gap-2">
-          <Input readOnly value={linkConvite} onFocus={(e) => e.target.select()} />
-          <Button
-            variante="secundario"
-            onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(linkConvite);
-              } catch {
-                /* alguns navegadores exigem seleção manual; o campo já fica selecionado ao focar */
-              }
-              setCopiado(true);
-              setTimeout(() => setCopiado(false), 2000);
+      {souAdmin && (
+        <Card>
+          <p className="eyebrow mb-1">Convidar jogador</p>
+          <p className="mb-3 text-sm text-tinta-soft">
+            Compartilhe este link. Quem abrir e estiver logado entra direto na organização.
+          </p>
+          <div className="flex items-center gap-2">
+            <Input readOnly value={linkConvite} onFocus={(e) => e.target.select()} />
+            <Button
+              variante="secundario"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(linkConvite);
+                } catch {
+                  /* alguns navegadores exigem seleção manual; o campo já fica selecionado ao focar */
+                }
+                setCopiado(true);
+                setTimeout(() => setCopiado(false), 2000);
+              }}
+            >
+              {copiado ? 'Copiado!' : 'Copiar'}
+            </Button>
+          </div>
+
+          <p className="eyebrow mb-1 mt-4">Já tem cadastro?</p>
+          <p className="mb-3 text-sm text-tinta-soft">
+            Adicione direto pelo telefone da conta que a pessoa já criou.
+          </p>
+          {okAdicionar && <Aviso tipo="ok">{okAdicionar}</Aviso>}
+          <form
+            className="flex items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              adicionar.mutate({ telefone: telefoneNovo });
             }}
           >
-            {copiado ? 'Copiado!' : 'Copiar'}
-          </Button>
-        </div>
-
-        <p className="eyebrow mb-1 mt-4">Já tem cadastro?</p>
-        <p className="mb-3 text-sm text-tinta-soft">
-          Adicione direto pelo telefone da conta que a pessoa já criou.
-        </p>
-        {okAdicionar && <Aviso tipo="ok">{okAdicionar}</Aviso>}
-        <form
-          className="flex items-center gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            adicionar.mutate({ telefone: telefoneNovo });
-          }}
-        >
-          <Input
-            inputMode="tel"
-            placeholder="(11) 91234-5678"
-            maxLength={15}
-            value={telefoneNovo}
-            onChange={(e) => setTelefoneNovo(mascararTelefone(e.target.value))}
-          />
-          <Button type="submit" variante="secundario" disabled={adicionar.isPending || !telefoneNovo}>
-            {adicionar.isPending ? <Spinner /> : 'Adicionar'}
-          </Button>
-        </form>
-      </Card>
+            <Input
+              inputMode="tel"
+              placeholder="(11) 91234-5678"
+              maxLength={15}
+              value={telefoneNovo}
+              onChange={(e) => setTelefoneNovo(mascararTelefone(e.target.value))}
+            />
+            <Button type="submit" variante="secundario" disabled={adicionar.isPending || !telefoneNovo}>
+              {adicionar.isPending ? <Spinner /> : 'Adicionar'}
+            </Button>
+          </form>
+        </Card>
+      )}
 
       <Input placeholder="Buscar por nome ou telefone" value={busca} onChange={(e) => setBusca(e.target.value)} />
 
@@ -149,38 +174,68 @@ export function Administradores() {
               </span>
             </div>
 
-            <div className="mt-3 flex items-center justify-between">
+            <div className="mt-3 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Estrelas n={m.estrelas} />
-                <input
-                  type="range"
-                  min={1}
-                  max={5}
-                  value={m.estrelas}
-                  onChange={(e) =>
-                    estrelas.mutate({ profileId: m.profileId, estrelas: Number(e.target.value) })
-                  }
-                  className="w-24 accent-campo-600"
-                />
+                {souAdmin && (
+                  <input
+                    type="range"
+                    min={1}
+                    max={5}
+                    value={m.estrelas}
+                    onChange={(e) =>
+                      estrelas.mutate({ profileId: m.profileId, estrelas: Number(e.target.value) })
+                    }
+                    className="w-24 accent-campo-600"
+                  />
+                )}
               </div>
 
-              {souDono && m.papel !== 'admin_principal' && (
-                <Button
-                  variante="secundario"
-                  onClick={() =>
-                    promover.mutate({
-                      profileId: m.profileId,
-                      papel: m.papel === 'admin' ? 'jogador' : 'admin',
-                    })
-                  }
-                >
-                  {m.papel === 'admin' ? 'Rebaixar' : 'Tornar admin'}
-                </Button>
-              )}
+              <div className="flex items-center gap-2">
+                {souDono && m.papel !== 'admin_principal' && (
+                  <Button
+                    variante="secundario"
+                    onClick={() =>
+                      promover.mutate({
+                        profileId: m.profileId,
+                        papel: m.papel === 'admin' ? 'jogador' : 'admin',
+                      })
+                    }
+                  >
+                    {m.papel === 'admin' ? 'Rebaixar' : 'Tornar admin'}
+                  </Button>
+                )}
+
+                {souAdmin &&
+                  m.papel !== 'admin_principal' &&
+                  m.profileId !== usuario?.id &&
+                  (m.papel === 'jogador' || souDono) && (
+                    <Button
+                      variante="perigo"
+                      onClick={() => {
+                        if (!confirm(`Remover ${m.nome ?? 'este jogador'} da organização?`)) return;
+                        remover.mutate({ profileId: m.profileId });
+                      }}
+                    >
+                      Excluir
+                    </Button>
+                  )}
+              </div>
             </div>
           </Card>
         ))}
       </div>
+
+      {vinculo && !souDono && (
+        <Card>
+          <button
+            className="w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-barro-600 hover:bg-barro-100/50"
+            onClick={sair}
+          >
+            Sair da organização
+          </button>
+        </Card>
+      )}
 
       {souDono && (
         <Card>

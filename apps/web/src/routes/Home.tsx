@@ -82,14 +82,12 @@ export function Home() {
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">
                   <Estrelas n={o.estrelas} />
-                  {(o.papel === 'admin' || o.papel === 'admin_principal') && (
-                    <Link
-                      to={`/org/${o.id}/admins`}
-                      className="font-display text-[0.7rem] font-semibold uppercase tracking-[0.04em] text-campo-700"
-                    >
-                      Gerir
-                    </Link>
-                  )}
+                  <Link
+                    to={`/org/${o.id}/admins`}
+                    className="font-display text-[0.7rem] font-semibold uppercase tracking-[0.04em] text-campo-700"
+                  >
+                    {o.papel === 'jogador' ? 'Ver' : 'Gerir'}
+                  </Link>
                 </div>
               </Card>
             ))}
