@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { OrganizacaoDoUsuario } from '@resenha05/shared';
 import { useAuth } from './auth';
 
@@ -26,10 +26,10 @@ export function OrgProvider({ children }: { children: ReactNode }) {
     }
   }, [orgs, orgId]);
 
-  function setOrgId(id: string) {
+  const setOrgId = useCallback((id: string) => {
     setOrgIdState(id);
     localStorage.setItem(CHAVE, id);
-  }
+  }, []);
 
   const valor = useMemo<OrgCtx>(() => {
     const org = orgs.find((o) => o.id === orgId) ?? orgs[0];
@@ -40,7 +40,7 @@ export function OrgProvider({ children }: { children: ReactNode }) {
       org,
       admin: org?.papel === 'admin' || org?.papel === 'admin_principal',
     };
-  }, [orgs, orgId]);
+  }, [orgs, orgId, setOrgId]);
 
   return <Ctx.Provider value={valor}>{children}</Ctx.Provider>;
 }

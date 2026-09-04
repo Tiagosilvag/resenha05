@@ -1,5 +1,5 @@
 import { useEffect, useState, type ComponentType, type ReactNode, type SVGProps } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Logo } from './Logo';
 import { useOrg } from '../lib/org';
 import { cn } from './ui';
@@ -32,12 +32,23 @@ const ITENS: { to: string; rotulo: string; Icone: ComponentType<SVGProps<SVGSVGE
 
 function SeletorOrg({ className, escuro = false }: { className?: string; escuro?: boolean }) {
   const { orgs, orgId, setOrgId } = useOrg();
+  const nav = useNavigate();
+  const loc = useLocation();
+
+  // Rotas que levam a organização na URL (ex.: /org/<id>/admins) não seguem só
+  // o contexto — precisam trocar o id no caminho junto com o seletor.
+  function trocar(novo: string) {
+    setOrgId(novo);
+    const resto = loc.pathname.match(/^\/org\/[^/]+(\/.*)?$/)?.[1] ?? null;
+    if (resto !== null) nav(`/org/${novo}${resto}`, { replace: true });
+  }
+
   if (orgs.length < 2) return null;
   return (
     <div className={`relative ${className ?? ''}`}>
       <select
         value={orgId}
-        onChange={(e) => setOrgId(e.target.value)}
+        onChange={(e) => trocar(e.target.value)}
         aria-label="Trocar de organização"
         className={[
           'w-full appearance-none rounded-full border py-1.5 pl-3 pr-8 font-display text-xs font-semibold uppercase tracking-[0.04em]',

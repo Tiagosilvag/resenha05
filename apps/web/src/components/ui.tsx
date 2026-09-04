@@ -244,24 +244,33 @@ export function MiniCartinha({
   return (
     <span
       style={estilo}
-      className="relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-md border border-ouro-300 bg-gradient-to-b from-noite-raised to-noite shadow-ouro"
+      className="relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-md border-2 border-ouro-300 bg-noite shadow-ouro"
     >
+      {/* fundo: holofote no alto e faixas diagonais, como na arte da carta —
+          aparece em volta de quem tem a foto recortada */}
+      <span
+        className="pointer-events-none absolute inset-0"
+        style={{
+          backgroundImage:
+            'radial-gradient(circle at 50% 24%, rgba(231,193,88,0.32) 0%, rgba(231,193,88,0.07) 46%, rgba(0,0,0,0) 72%), repeating-linear-gradient(115deg, rgba(231,193,88,0.12) 0 3px, rgba(231,193,88,0) 3px 11px)',
+        }}
+      />
       {src ? (
         <img
           src={src}
           alt={nome ?? ''}
-          className={cn('h-full w-full object-cover', recortada && 'object-top')}
+          className={cn('relative h-full w-full object-cover', recortada && 'object-top')}
         />
       ) : (
         <span
           style={{ fontSize: Math.round(largura * 0.3) }}
-          className="font-display font-bold text-ouro-300"
+          className="relative font-display font-bold text-ouro-300"
         >
           {iniciaisDe(nome)}
         </span>
       )}
-      {/* filete interno dourado, brilho no topo e base escurecida — ecoa a arte da carta */}
-      <span className="pointer-events-none absolute inset-0 rounded-md bg-gradient-to-t from-noite/70 via-transparent to-ouro-300/15 ring-1 ring-inset ring-ouro-200/25" />
+      {/* filete interno dourado e base escurecida — ecoam a moldura da carta */}
+      <span className="pointer-events-none absolute inset-0 rounded-[3px] bg-gradient-to-t from-noite/70 via-transparent to-transparent ring-1 ring-inset ring-ouro-200/30" />
     </span>
   );
 }

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatarTelefone } from '@resenha05/shared';
 import { useAuth } from '../lib/auth';
+import { useOrg } from '../lib/org';
 import { api, ApiError } from '../lib/api';
 import { Aviso, Button, Card, Estrelas, Input, MiniCartinha, Spinner } from '../components/ui';
 
@@ -40,6 +41,12 @@ export function Administradores() {
     const t = setTimeout(() => setTermoDebounced(termoAdicionar.trim()), 300);
     return () => clearTimeout(t);
   }, [termoAdicionar]);
+
+  // Esta tela é da organização que está na URL — alinha o seletor do topo a ela.
+  const { orgId: orgSelecionada, setOrgId } = useOrg();
+  useEffect(() => {
+    if (orgId && orgId !== orgSelecionada) setOrgId(orgId);
+  }, [orgId, orgSelecionada, setOrgId]);
 
   const vinculo = usuario?.organizacoes.find((o) => o.id === orgId);
   const souDono = vinculo?.papel === 'admin_principal';
