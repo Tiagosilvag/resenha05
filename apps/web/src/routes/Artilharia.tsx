@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { useOrg } from '../lib/org';
-import { Avatar, Card, Eyebrow, Select, Spinner } from '../components/ui';
+import { Card, Eyebrow, MiniCartinha, Select, Spinner } from '../components/ui';
 
 interface LinhaRanking {
   profileId: string;
@@ -61,7 +61,7 @@ export function Artilharia() {
                   <span className={`grid h-7 w-7 place-items-center rounded-full font-display text-sm font-bold ${MEDALHA[i]}`}>
                     {i + 1}
                   </span>
-                  <Avatar src={l.fotoUrl} nome={l.nome} size={36} />
+                  <MiniCartinha src={l.fotoUrl} nome={l.nome} largura={36} />
                   <span className="flex-1 truncate font-medium">{l.nome ?? 'Jogador'}</span>
                   <span className="placar-num text-xl text-ouro-300">{l.gols}</span>
                   <span className="text-xs text-white/50">gols</span>

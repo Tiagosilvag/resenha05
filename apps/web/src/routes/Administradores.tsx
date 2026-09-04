@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatarTelefone } from '@resenha05/shared';
 import { useAuth } from '../lib/auth';
 import { api, ApiError } from '../lib/api';
-import { Avatar, Aviso, Button, Card, Estrelas, Input, Spinner } from '../components/ui';
+import { Aviso, Button, Card, Estrelas, Input, MiniCartinha, Spinner } from '../components/ui';
 
 interface Membro {
   profileId: string;
@@ -185,7 +185,7 @@ export function Administradores() {
                       className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-campo-50 disabled:opacity-50"
                       onClick={() => adicionar.mutate({ profileId: p.profileId })}
                     >
-                      <Avatar src={p.fotoUrl} nome={p.nome} recortada={p.fotoRecortada} size={36} />
+                      <MiniCartinha src={p.fotoUrl} nome={p.nome} recortada={p.fotoRecortada} largura={36} />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold">{p.nome ?? 'Sem nome'}</p>
                         <p className="text-xs text-tinta-faint">{formatarTelefone(p.telefone)}</p>
@@ -209,7 +209,7 @@ export function Administradores() {
           return (
             <Card key={m.profileId}>
               <div className="flex items-center gap-3">
-                <Avatar src={m.fotoUrl} nome={m.nome} recortada={m.fotoRecortada} />
+                <MiniCartinha src={m.fotoUrl} nome={m.nome} recortada={m.fotoRecortada} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold">{m.nome ?? 'Sem nome'}</p>
                   <p className="text-xs text-tinta-faint">{formatarTelefone(m.telefone)}</p>

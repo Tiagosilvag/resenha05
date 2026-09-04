@@ -177,6 +177,15 @@ export function Estrelas({ n, className }: { n: number; className?: string }) {
 }
 
 /* ── Avatar ───────────────────────────────────────────────────────────────── */
+function iniciaisDe(nome?: string | null) {
+  return (nome ?? '?')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase())
+    .join('');
+}
+
 export function Avatar({
   src,
   nome,
@@ -188,12 +197,7 @@ export function Avatar({
   size?: number;
   recortada?: boolean;
 }) {
-  const iniciais = (nome ?? '?')
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase())
-    .join('');
+  const iniciais = iniciaisDe(nome);
   const estilo = { width: size, height: size } as const;
   if (!src) {
     return (
@@ -218,6 +222,46 @@ export function Avatar({
         alt={nome ?? ''}
         className={cn('h-full w-full', recortada ? 'object-cover object-top' : 'object-cover')}
       />
+    </span>
+  );
+}
+
+/* ── Mini cartinha ────────────────────────────────────────────────────────── */
+/** Foto do jogador na moldura dourada da cartinha, para listas. */
+export function MiniCartinha({
+  src,
+  nome,
+  largura = 46,
+  recortada = false,
+}: {
+  src?: string | null;
+  nome?: string | null;
+  largura?: number;
+  recortada?: boolean;
+}) {
+  // mesma proporção da arte gerada pela API (720 × 1010)
+  const estilo = { width: largura, height: Math.round((largura * 101) / 72) } as const;
+  return (
+    <span
+      style={estilo}
+      className="relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-md border border-ouro-300 bg-gradient-to-b from-noite-raised to-noite shadow-ouro"
+    >
+      {src ? (
+        <img
+          src={src}
+          alt={nome ?? ''}
+          className={cn('h-full w-full object-cover', recortada && 'object-top')}
+        />
+      ) : (
+        <span
+          style={{ fontSize: Math.round(largura * 0.3) }}
+          className="font-display font-bold text-ouro-300"
+        >
+          {iniciaisDe(nome)}
+        </span>
+      )}
+      {/* filete interno dourado, brilho no topo e base escurecida — ecoa a arte da carta */}
+      <span className="pointer-events-none absolute inset-0 rounded-md bg-gradient-to-t from-noite/70 via-transparent to-ouro-300/15 ring-1 ring-inset ring-ouro-200/25" />
     </span>
   );
 }

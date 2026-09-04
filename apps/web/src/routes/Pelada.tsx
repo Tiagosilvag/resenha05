@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../lib/auth';
 import { api, ApiError, baixarPng } from '../lib/api';
-import { Avatar, Aviso, Button, Card, Chip, Estrelas, Eyebrow, Spinner, StatTile } from '../components/ui';
+import { Aviso, Button, Card, Chip, Estrelas, Eyebrow, MiniCartinha, Spinner, StatTile } from '../components/ui';
 import { CartinhaModal } from '../components/Cartinha';
 
 interface Presenca {
@@ -115,7 +115,7 @@ export function Pelada() {
                 className="flex min-w-0 flex-1 items-center gap-3 text-left"
                 onClick={() => setVerCard({ id: p.profileId, nome: p.nome })}
               >
-                <Avatar src={p.fotoUrl} nome={p.nome} size={34} recortada={p.fotoRecortada} />
+                <MiniCartinha src={p.fotoUrl} nome={p.nome} largura={34} recortada={p.fotoRecortada} />
                 <span className="min-w-0">
                   <span className={`block truncate text-sm font-medium ${p.status === 'desistiu' ? 'line-through' : ''}`}>
                     {p.nome ?? 'Jogador'}
