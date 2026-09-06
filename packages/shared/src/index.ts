@@ -23,6 +23,8 @@ export interface SessaoUsuario {
 export interface OrganizacaoDoUsuario {
   id: string;
   nome: string;
+  /** Código curto que outras pessoas digitam para entrar. */
+  codigo: string;
   papel: 'jogador' | 'admin' | 'admin_principal';
   estrelas: number;
 }

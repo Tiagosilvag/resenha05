@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { formatarTelefone } from '@resenha05/shared';
+import { MAX_ADMINS, formatarTelefone } from '@resenha05/shared';
 import { useAuth } from '../lib/auth';
 import { useOrg } from '../lib/org';
 import { api, ApiError } from '../lib/api';
@@ -53,6 +53,7 @@ export function Administradores() {
   const souAdmin = souDono || vinculo?.papel === 'admin';
   const linkConvite = `${window.location.origin}/entrar-org/${orgId}`;
   const [copiado, setCopiado] = useState(false);
+  const [codigoCopiado, setCodigoCopiado] = useState(false);
 
   const { data: membros, isLoading } = useQuery({
     queryKey: ['membros', orgId],
@@ -132,7 +133,7 @@ export function Administradores() {
         </h1>
         <p className="text-sm text-tinta-soft">
           {souAdmin
-            ? `${totalAdmins}/5 admins. ${souDono ? 'Você é o admin principal.' : 'Só o admin principal promove.'}`
+            ? `${totalAdmins}/${MAX_ADMINS} admins${totalAdmins >= MAX_ADMINS ? ' (limite atingido)' : ''}. ${souDono ? 'Você é o admin principal.' : 'Só o admin principal promove.'}`
             : `${(membros ?? []).length} membro(s).`}
         </p>
       </div>
@@ -140,7 +141,31 @@ export function Administradores() {
 
       {souAdmin && (
         <Card>
-          <p className="eyebrow mb-1">Convidar jogador</p>
+          <p className="eyebrow mb-1">Código da organização</p>
+          <p className="mb-2 text-sm text-tinta-soft">
+            Quem digitar este código — no cadastro ou na tela de início — entra na organização.
+          </p>
+          <div className="flex items-center gap-2">
+            <span className="placar-num flex-1 rounded-xl border border-campo-300 bg-campo-50 px-3 py-2.5 text-center text-xl tracking-[0.3em] text-campo-800">
+              {vinculo?.codigo ?? '—'}
+            </span>
+            <Button
+              variante="secundario"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(vinculo?.codigo ?? '');
+                } catch {
+                  /* alguns navegadores exigem a cópia manual */
+                }
+                setCodigoCopiado(true);
+                setTimeout(() => setCodigoCopiado(false), 2000);
+              }}
+            >
+              {codigoCopiado ? 'Copiado!' : 'Copiar'}
+            </Button>
+          </div>
+
+          <p className="eyebrow mb-1 mt-4">Convidar por link</p>
           <p className="mb-3 text-sm text-tinta-soft">
             Compartilhe este link. Quem abrir e estiver logado entra direto na organização.
           </p>
@@ -209,7 +234,10 @@ export function Administradores() {
 
       <div className="flex flex-col gap-2">
         {filtrados.map((m) => {
-          const podePromover = souDono && m.papel !== 'admin_principal';
+          const limiteAdmins = totalAdmins >= MAX_ADMINS;
+          // Virar admin só quando ainda houver vaga; rebaixar é sempre possível.
+          const podePromover =
+            souDono && m.papel !== 'admin_principal' && (m.papel === 'admin' || !limiteAdmins);
           const podeExcluir =
             souAdmin && m.papel !== 'admin_principal' && m.profileId !== usuario?.id && (m.papel === 'jogador' || souDono);
 

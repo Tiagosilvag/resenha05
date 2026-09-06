@@ -22,9 +22,9 @@ export function Cadastro() {
   const [telefone, setTelefone] = useState('');
   const [senha, setSenha] = useState('');
   const [timeCoracao, setTimeCoracao] = useState('');
+  const [codigoOrg, setCodigoOrg] = useState('');
   const [foto, setFoto] = useState<File | null>(null);
   const [previa, setPrevia] = useState<string | null>(null);
-  const [recortar, setRecortar] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
@@ -45,6 +45,7 @@ export function Cadastro() {
       telefone,
       senha,
       timeCoracao: timeCoracao || null,
+      codigoOrganizacao: codigoOrg.trim() || undefined,
     });
     if (!parsed.success) {
       setErro(parsed.error.issues[0]?.message ?? 'Confira os dados.');
@@ -59,8 +60,8 @@ export function Cadastro() {
     try {
       await cadastrar(parsed.data);
       try {
-        setEtapa(recortar ? 'Recortando a foto…' : 'Enviando foto…');
-        await enviarFoto(foto, { recortar });
+        setEtapa('Recortando a foto…');
+        await enviarFoto(foto, { recortar: true });
       } catch {
         setAviso('Conta criada, mas a foto não subiu. Tente de novo no Perfil.');
       }
@@ -105,21 +106,11 @@ export function Cadastro() {
             <div className="min-w-0 flex-1 text-sm">
               <p className="font-semibold text-tinta">Foto de perfil</p>
               <p className="text-xs text-tinta-faint">Obrigatória. JPEG, PNG ou WebP.</p>
-              <label className="mt-1.5 flex cursor-pointer items-center gap-2 text-xs text-tinta-soft">
-                <input
-                  type="checkbox"
-                  checked={recortar}
-                  onChange={(e) => setRecortar(e.target.checked)}
-                  className="h-4 w-4 shrink-0 accent-campo-600"
-                />
-                Recortar o fundo (estilo card)
-              </label>
             </div>
             <input
               ref={fileRef}
               type="file"
               accept="image/jpeg,image/png,image/webp"
-              capture="user"
               className="hidden"
               onChange={(e) => escolherFoto(e.target.files?.[0] ?? null)}
             />
@@ -141,6 +132,20 @@ export function Cadastro() {
           </Field>
           <Field label="Senha" dica="Mínimo 8 caracteres.">
             <Input type="password" autoComplete="new-password" value={senha} onChange={(e) => setSenha(e.target.value)} required />
+          </Field>
+          <Field
+            label="Código da organização (opcional)"
+            dica="Peça ao organizador. Com ele você já entra na pelada dele."
+          >
+            <Input
+              value={codigoOrg}
+              onChange={(e) => setCodigoOrg(e.target.value.toUpperCase())}
+              maxLength={6}
+              autoCapitalize="characters"
+              autoComplete="off"
+              placeholder="Ex.: 7AHP3Q"
+              className="placar-num tracking-[0.2em]"
+            />
           </Field>
           <Field label="Time do coração (opcional)">
             <Input list="times" value={timeCoracao} onChange={(e) => setTimeCoracao(e.target.value)} placeholder="Ex.: Flamengo" />

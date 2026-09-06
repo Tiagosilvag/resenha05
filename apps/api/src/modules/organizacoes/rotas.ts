@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import {
   criarOrganizacaoSchema,
+  entrarPorCodigoSchema,
   promoverMembroSchema,
   ajustarEstrelasSchema,
   adicionarMembroSchema,
@@ -27,7 +28,7 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
       const o = await tx
         .insertInto('organizacoes')
         .values({ nome, dono_id: req.usuario.id })
-        .returning(['id', 'nome'])
+        .returning(['id', 'nome', 'codigo'])
         .executeTakeFirstOrThrow();
       await tx
         .insertInto('organizacao_membros')
@@ -56,13 +57,14 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
     exigirMembro(req, id);
     const o = await db
       .selectFrom('organizacoes')
-      .select(['id', 'nome', 'status_assinatura', 'mp_token_cipher', 'mp_token_atualizado_em'])
+      .select(['id', 'nome', 'codigo', 'status_assinatura', 'mp_token_cipher', 'mp_token_atualizado_em'])
       .where('id', '=', id)
       .executeTakeFirst();
     if (!o) throw erro.naoEncontrado();
     return {
       id: o.id,
       nome: o.nome,
+      codigo: o.codigo,
       statusAssinatura: o.status_assinatura,
       mercadoPagoConectado: o.mp_token_cipher != null,
       mercadoPagoAtualizadoEm: o.mp_token_atualizado_em,
@@ -86,6 +88,25 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
       .execute();
     reply.code(201);
     return { ok: true };
+  });
+
+  // Entrar digitando o código curto da organização.
+  app.post('/organizacoes/entrar-por-codigo', async (req, reply) => {
+    const { codigo } = validar(entrarPorCodigoSchema, req.body);
+    const org = await db
+      .selectFrom('organizacoes')
+      .select(['id', 'nome'])
+      .where('codigo', '=', codigo)
+      .executeTakeFirst();
+    if (!org) throw erro.naoEncontrado('Nenhuma organização com esse código.');
+
+    await db
+      .insertInto('organizacao_membros')
+      .values({ organizacao_id: org.id, profile_id: req.usuario.id, papel: 'jogador' })
+      .onConflict((oc) => oc.columns(['organizacao_id', 'profile_id']).doNothing())
+      .execute();
+    reply.code(201);
+    return org;
   });
 
   // Membro sai da organização por conta própria (o dono não pode sair — só encerrar).

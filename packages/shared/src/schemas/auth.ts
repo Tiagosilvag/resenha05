@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { normalizarTelefone, telefoneCelularValido } from '../telefone.js';
+import { codigoOrganizacao } from './organizacao.js';
 
 const telefone = z
   .string()
@@ -19,6 +20,8 @@ export const cadastroSchema = z.object({
   telefone,
   senha,
   timeCoracao: z.string().trim().max(60).optional().nullable(),
+  /** Entra direto numa organização já no cadastro. */
+  codigoOrganizacao: codigoOrganizacao.optional(),
 });
 export type CadastroInput = z.infer<typeof cadastroSchema>;
 

@@ -1,8 +1,9 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../lib/auth';
-import { api } from '../lib/api';
-import { Card, Estrelas, Button, Eyebrow } from '../components/ui';
+import { api, ApiError } from '../lib/api';
+import { Aviso, Button, Card, Estrelas, Eyebrow, Input, Spinner } from '../components/ui';
 
 interface ExtraResp {
   progresso: number;
@@ -32,7 +33,31 @@ function AnelProgresso({ pct }: { pct: number }) {
 }
 
 export function Home() {
-  const { usuario } = useAuth();
+  const { usuario, recarregar } = useAuth();
+  const [codigo, setCodigo] = useState('');
+  const [entrando, setEntrando] = useState(false);
+  const [msgCodigo, setMsgCodigo] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null);
+
+  async function entrarPorCodigo() {
+    setEntrando(true);
+    setMsgCodigo(null);
+    try {
+      const org = await api<{ nome: string }>('/organizacoes/entrar-por-codigo', {
+        method: 'POST',
+        json: { codigo },
+      });
+      await recarregar();
+      setCodigo('');
+      setMsgCodigo({ tipo: 'ok', texto: `Você entrou na ${org.nome}!` });
+    } catch (e) {
+      setMsgCodigo({
+        tipo: 'erro',
+        texto: e instanceof ApiError ? e.message : 'Não foi possível entrar.',
+      });
+    } finally {
+      setEntrando(false);
+    }
+  }
   const { data } = useQuery({
     queryKey: ['perfil-extra'],
     queryFn: () => api<ExtraResp>('/perfil/extra'),
@@ -99,6 +124,34 @@ export function Home() {
             </p>
           </Card>
         )}
+        <Card className="mt-2.5">
+          <p className="eyebrow mb-1">Entrar com código</p>
+          <p className="mb-2 text-sm text-tinta-soft">
+            Tem o código de uma organização? Digite aqui para entrar.
+          </p>
+          {msgCodigo && <Aviso tipo={msgCodigo.tipo}>{msgCodigo.texto}</Aviso>}
+          <form
+            className="mt-2 flex items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void entrarPorCodigo();
+            }}
+          >
+            <Input
+              value={codigo}
+              onChange={(e) => setCodigo(e.target.value.toUpperCase())}
+              maxLength={6}
+              autoCapitalize="characters"
+              autoComplete="off"
+              placeholder="Ex.: 7AHP3Q"
+              className="placar-num tracking-[0.2em]"
+            />
+            <Button type="submit" variante="secundario" disabled={entrando || codigo.trim().length < 6}>
+              {entrando ? <Spinner /> : 'Entrar'}
+            </Button>
+          </form>
+        </Card>
+
         <Link
           to="/nova-organizacao"
           className="mt-2.5 inline-flex items-center gap-1.5 font-display text-sm font-semibold uppercase tracking-[0.04em] text-campo-700"

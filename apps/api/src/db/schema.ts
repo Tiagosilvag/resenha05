@@ -40,6 +40,8 @@ export interface PerfilExtraTable {
 export interface OrganizacoesTable {
   id: Generated<string>;
   nome: string;
+  /** Código curto para entrar na organização (gerado por default no banco). */
+  codigo: Generated<string>;
   dono_id: string;
   mp_token_cipher: Buffer | null;
   mp_token_nonce: Buffer | null;

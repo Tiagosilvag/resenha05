@@ -17,23 +17,45 @@ export const rotasAuth: FastifyPluginAsync = async (app) => {
       .executeTakeFirst();
     if (jaExiste) throw erro.conflito('Já existe uma conta com esse telefone.');
 
+    // Confere o código antes de criar a conta: assim ninguém termina o
+    // cadastro achando que entrou numa organização que não existe.
+    let organizacaoId: string | null = null;
+    if (dados.codigoOrganizacao) {
+      const org = await db
+        .selectFrom('organizacoes')
+        .select('id')
+        .where('codigo', '=', dados.codigoOrganizacao)
+        .executeTakeFirst();
+      if (!org) throw erro.invalido('Nenhuma organização com esse código.');
+      organizacaoId = org.id;
+    }
+
     const senha_hash = await hashSenha(dados.senha);
     let profileId: string;
     try {
-      const novo = await db
-        .insertInto('profiles')
-        .values({
-          nome: dados.nome,
-          telefone: dados.telefone,
-          senha_hash,
-          time_coracao: dados.timeCoracao ?? null,
-          // MVP: telefone considerado verificado no cadastro. Trocar por
-          // fluxo de código via WhatsApp antes de abrir para outros organizadores.
-          telefone_verificado_em: new Date(),
-        })
-        .returning('id')
-        .executeTakeFirstOrThrow();
-      profileId = novo.id;
+      profileId = await db.transaction().execute(async (tx) => {
+        const novo = await tx
+          .insertInto('profiles')
+          .values({
+            nome: dados.nome,
+            telefone: dados.telefone,
+            senha_hash,
+            time_coracao: dados.timeCoracao ?? null,
+            // MVP: telefone considerado verificado no cadastro. Trocar por
+            // fluxo de código via WhatsApp antes de abrir para outros organizadores.
+            telefone_verificado_em: new Date(),
+          })
+          .returning('id')
+          .executeTakeFirstOrThrow();
+
+        if (organizacaoId) {
+          await tx
+            .insertInto('organizacao_membros')
+            .values({ organizacao_id: organizacaoId, profile_id: novo.id, papel: 'jogador' })
+            .execute();
+        }
+        return novo.id;
+      });
     } catch (e) {
       if ((e as { code?: string }).code === '23505') {
         throw erro.conflito('Já existe uma conta com esse telefone.');
