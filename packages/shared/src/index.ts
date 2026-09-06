@@ -1,4 +1,5 @@
 export * from './telefone.js';
+export * from './times.js';
 export * from './sorteio.js';
 export * from './schemas/auth.js';
 export * from './schemas/perfil.js';

@@ -504,5 +504,19 @@ create unique index uq_organizacoes_codigo on organizacoes (codigo);
 INSERT INTO _migrations (nome) VALUES ('0007_organizacao_codigo.sql') ON CONFLICT DO NOTHING;
 COMMIT;
 
+-- ============================ 0008_periodo_artilharia.sql ============================
+\echo '== 0008_periodo_artilharia.sql =='
+BEGIN;
+-- =============================================================================
+-- Periodo do painel de artilharia da organizacao: o dono escolhe se a disputa
+-- fecha por semana, mes ou trimestre.
+-- =============================================================================
+
+alter table organizacoes
+  add column periodo_artilharia text not null default 'mes'
+    check (periodo_artilharia in ('semana', 'mes', 'trimestre'));
+INSERT INTO _migrations (nome) VALUES ('0008_periodo_artilharia.sql') ON CONFLICT DO NOTHING;
+COMMIT;
+
 \echo ''
 \echo 'Pronto. Schema resenha05 criado. Deploys seguintes: node db/migrate.mjs'

@@ -50,14 +50,20 @@ export function h(type: string, props: Record<string, unknown>, ...children: unk
 
 export async function elementoParaPng(
   elemento: El,
-  opts: { width: number; height?: number },
+  opts: {
+    width: number;
+    height?: number;
+    /** Recebe o SVG do satori e devolve o SVG final (recorte, moldura, etc). */
+    envolverSvg?: (svg: string) => string;
+  },
 ): Promise<Buffer> {
   const svg = await satori(elemento as unknown as Parameters<typeof satori>[0], {
     width: opts.width,
     ...(opts.height ? { height: opts.height } : {}),
     fonts: await fontes(),
   });
+  const final = opts.envolverSvg ? opts.envolverSvg(svg) : svg;
   return Buffer.from(
-    new Resvg(svg, { fitTo: { mode: 'width', value: opts.width } }).render().asPng(),
+    new Resvg(final, { fitTo: { mode: 'width', value: opts.width } }).render().asPng(),
   );
 }

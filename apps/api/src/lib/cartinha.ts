@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   ATRIBUTOS_CARTA,
+  coresDoTime,
   ROTULO_ATRIBUTO,
   calcularAtributos,
   selo,
@@ -12,7 +13,13 @@ import {
 import { UPLOADS_DIR } from './uploads.js';
 import { PALETA, h, elementoParaPng, logoDataUri, type El } from './satori-base.js';
 
-const { ouro: OURO, ouroEscuro: OURO_ESCURO, creme: CRE, dim: DIM } = PALETA;
+const { creme: CRE, dim: DIM } = PALETA;
+
+/** #RRGGBB + alfa -> rgba(), para os detalhes de fundo seguirem a cor do time. */
+function comAlfa(hex: string, alfa: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alfa})`;
+}
 
 async function fotoDataUri(fotoUrl: string | null): Promise<string | null> {
   if (!fotoUrl) return null;
@@ -33,10 +40,27 @@ export interface DadosCartinha extends EntradaCartinha {
   fotoUrl: string | null;
   fotoRecortada?: boolean;
   pePreferido?: string | null;
+  /** Time do coração — define as cores da carta. */
+  timeCoracao?: string | null;
 }
 
 const L = 720;
 const A = 1010;
+
+/**
+ * Silhueta de brasão: ombros retos, base afunilando até a ponta. É a moldura
+ * da carta inteira — o conteúdo tem que caber na parte larga, de cima.
+ */
+const ESCUDO = [
+  'M 26 46',
+  'Q 26 14 62 14',
+  'L 658 14',
+  'Q 694 14 694 46',
+  'L 694 606',
+  'C 694 806 566 918 360 996',
+  'C 154 918 26 806 26 606',
+  'Z',
+].join(' ');
 
 export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
   const at = calcularAtributos(dados);
@@ -47,13 +71,14 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
   const pos = selo(dados.posicao as Posicao | null);
   const pe = seloPe(dados.pePreferido);
   const estrelas = Math.min(5, Math.max(1, Math.round(dados.estrelas || 3)));
+  const { brilho, fundo, contorno } = coresDoTime(dados.timeCoracao);
 
   const stat = (a: (typeof ATRIBUTOS_CARTA)[number]): El =>
     h(
       'div',
       { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', width: '25%' } },
-      h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 24, color: OURO, letterSpacing: 2 } }, ROTULO_ATRIBUTO[a]),
-      h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 800, fontSize: 54, color: CRE, lineHeight: 1 } }, String(at[a])),
+      h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 21, color: brilho, letterSpacing: 1 } }, ROTULO_ATRIBUTO[a]),
+      h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 800, fontSize: 46, color: CRE, lineHeight: 1 } }, String(at[a])),
     );
 
   const camadaAbsoluta = (...filhos: El[]): El =>
@@ -68,8 +93,8 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
   const fundoDetalhes: El = camadaAbsoluta(
     // anéis de "holofote" atrás do jogador
     ...[
-      { d: 604, x: 58, y: 150, cor: 'rgba(231,193,88,0.11)' },
-      { d: 430, x: 145, y: 237, cor: 'rgba(231,193,88,0.07)' },
+      { d: 604, x: 58, y: 150, cor: comAlfa(brilho, 0.11) },
+      { d: 430, x: 145, y: 237, cor: comAlfa(brilho, 0.07) },
     ].map(({ d, x, y, cor }) =>
       h('div', {
         style: {
@@ -95,7 +120,7 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
           width: 36,
           height: 1620,
           transform: 'rotate(-22deg)',
-          backgroundColor: i % 2 === 0 ? 'rgba(231,193,88,0.055)' : 'rgba(231,193,88,0.025)',
+          backgroundColor: comAlfa(brilho, i % 2 === 0 ? 0.055 : 0.025),
         },
       }),
     ),
@@ -124,7 +149,7 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
           height: 58,
           ...pos,
           ...Object.fromEntries(
-            Object.keys(lados).map((lado) => [lado, '3px solid rgba(231,193,88,0.45)']),
+            Object.keys(lados).map((lado) => [lado, `3px solid ${comAlfa(brilho, 0.45)}`]),
           ),
         },
       }),
@@ -188,7 +213,7 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
             width: 500,
             height: 400,
             borderRadius: 22,
-            border: `2px solid ${OURO_ESCURO}`,
+            border: `2px solid ${contorno}`,
             overflow: 'hidden',
             alignItems: 'center',
             justifyContent: 'center',
@@ -223,8 +248,8 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
     h(
       'div',
       { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start' } },
-      h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 800, fontSize: 110, color: OURO, lineHeight: 0.9, textShadow: '0 4px 14px rgba(0,0,0,0.85)' } }, String(at.overall)),
-      h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 32, color: OURO, letterSpacing: 4, marginTop: 4, textShadow: '0 2px 8px rgba(0,0,0,0.85)' } }, pos),
+      h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 800, fontSize: 110, color: brilho, lineHeight: 0.9, textShadow: '0 4px 14px rgba(0,0,0,0.85)' } }, String(at.overall)),
+      h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 32, color: brilho, letterSpacing: 4, marginTop: 4, textShadow: '0 2px 8px rgba(0,0,0,0.85)' } }, pos),
       h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 22, color: recortada ? CRE : DIM, letterSpacing: 3, marginTop: 5, textShadow: '0 2px 8px rgba(0,0,0,0.85)' } }, `PÉ ${pe}`),
     ),
     h('img', { src: logo, style: { display: 'flex', height: 132, width: 88 } }),
@@ -241,8 +266,8 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
           width: 18,
           height: 18,
           transform: 'rotate(45deg)',
-          backgroundColor: i < estrelas ? OURO : 'transparent',
-          border: `2px solid ${i < estrelas ? OURO : DIM}`,
+          backgroundColor: i < estrelas ? brilho : 'transparent',
+          border: `2px solid ${i < estrelas ? brilho : comAlfa(brilho, 0.35)}`,
         },
       }),
     ),
@@ -259,14 +284,17 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
           flexDirection: 'column',
           alignItems: 'center',
           padding: 46,
+          // A ponta do escudo come as laterais embaixo: o conteúdo para antes.
+          paddingBottom: 168,
           position: 'relative',
           color: CRE,
           fontFamily: 'Barlow',
-          backgroundColor: '#0d0d0e',
-          backgroundImage:
-            'radial-gradient(circle at 50% 15%, #2c2510 0%, #14130f 48%, #0a0a0b 100%), linear-gradient(125deg, rgba(231,193,88,0.10) 0%, rgba(231,193,88,0) 38%, rgba(231,193,88,0) 62%, rgba(231,193,88,0.08) 100%)',
-          border: `6px solid ${OURO_ESCURO}`,
-          borderRadius: 40,
+          backgroundColor: fundo,
+          backgroundImage: [
+            `radial-gradient(circle at 50% 15%, ${comAlfa(brilho, 0.3)} 0%, ${comAlfa(brilho, 0.06)} 46%, ${comAlfa(brilho, 0)} 100%)`,
+            `linear-gradient(125deg, ${comAlfa(brilho, 0.1)} 0%, ${comAlfa(brilho, 0)} 38%, ${comAlfa(brilho, 0)} 62%, ${comAlfa(brilho, 0.08)} 100%)`,
+          ].join(', '),
+          // A moldura vem do recorte de escudo (envolverSvg), não da borda.
           overflow: 'hidden',
         },
       },
@@ -275,11 +303,11 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
 
   const infoInferior: El[] = [
     h('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: recortada ? 0 : 14 } },
-      h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 800, fontSize: 54, color: OURO, textAlign: 'center', lineHeight: 1 } }, nome),
+      h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 800, fontSize: 54, color: brilho, textAlign: 'center', lineHeight: 1 } }, nome),
       h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 20, color: DIM, letterSpacing: 3, marginTop: 6 } }, 'RESENHA 05'),
     ),
-    h('div', { style: { display: 'flex', width: 540, height: 3, backgroundColor: OURO_ESCURO, marginTop: 16, marginBottom: 14 } }),
-    h('div', { style: { display: 'flex', width: 540, justifyContent: 'space-between', marginBottom: 24 } }, ...ATRIBUTOS_CARTA.map(stat)),
+    h('div', { style: { display: 'flex', width: 430, height: 3, backgroundColor: contorno, marginTop: 16, marginBottom: 14 } }),
+    h('div', { style: { display: 'flex', width: 430, justifyContent: 'space-between', marginBottom: 20 } }, ...ATRIBUTOS_CARTA.map(stat)),
     rodape,
   ];
 
@@ -304,5 +332,19 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
     ? bloco([fundoDetalhes, camadaFoto, conteudoRecortado, cantoneiras])
     : bloco([fundoDetalhes, topo, camadaFoto, ...infoInferior, cantoneiras]);
 
-  return elementoParaPng(arvore, { width: L, height: A });
+  return elementoParaPng(arvore, {
+    width: L,
+    height: A,
+    // O satori não recorta em forma livre: a carta é montada retangular e o
+    // escudo é aplicado aqui, junto com a moldura na cor do time.
+    envolverSvg: (svgInterno) =>
+      [
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${L}" height="${A}" viewBox="0 0 ${L} ${A}">`,
+        `<defs><clipPath id="escudo"><path d="${ESCUDO}"/></clipPath></defs>`,
+        `<g clip-path="url(#escudo)">${svgInterno}</g>`,
+        `<path d="${ESCUDO}" fill="none" stroke="${contorno}" stroke-width="16" stroke-linejoin="round"/>`,
+        `<path d="${ESCUDO}" fill="none" stroke="${brilho}" stroke-width="5" stroke-linejoin="round"/>`,
+        '</svg>',
+      ].join(''),
+  });
 }

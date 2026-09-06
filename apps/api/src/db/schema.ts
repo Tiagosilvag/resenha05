@@ -42,6 +42,8 @@ export interface OrganizacoesTable {
   nome: string;
   /** Código curto para entrar na organização (gerado por default no banco). */
   codigo: Generated<string>;
+  /** Recorte da disputa de artilharia: 'semana' | 'mes' | 'trimestre'. */
+  periodo_artilharia: Generated<'semana' | 'mes' | 'trimestre'>;
   dono_id: string;
   mp_token_cipher: Buffer | null;
   mp_token_nonce: Buffer | null;

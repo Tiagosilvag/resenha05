@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Logo } from './Logo';
 import { useOrg } from '../lib/org';
 import { cn } from './ui';
+import { PopupArtilheiro } from './Artilheiro';
 import { IconeInicio, IconeBola, IconeTrofeu, IconePerfil } from './icons';
 
 /**
@@ -120,6 +121,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         </header>
         <div className="px-4 py-5 md:px-9 md:py-9">{children}</div>
       </main>
+
+      <PopupArtilheiro />
 
       {/* Bottom nav — mobile (escondida com o teclado aberto, ver useTecladoAberto) */}
       <nav

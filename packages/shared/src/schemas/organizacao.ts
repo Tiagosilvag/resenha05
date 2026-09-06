@@ -42,4 +42,17 @@ export const removerMembroSchema = z.object({
   profileId: z.string().uuid(),
 });
 
+export const PERIODOS_ARTILHARIA = ['semana', 'mes', 'trimestre'] as const;
+export type PeriodoArtilharia = (typeof PERIODOS_ARTILHARIA)[number];
+
+export const ROTULO_PERIODO: Record<PeriodoArtilharia, string> = {
+  semana: 'Semanal',
+  mes: 'Mensal',
+  trimestre: 'Trimestral',
+};
+
+export const periodoArtilhariaSchema = z.object({
+  periodo: z.enum(PERIODOS_ARTILHARIA),
+});
+
 export const MAX_ADMINS = 5;

@@ -6,6 +6,7 @@ import { useAuth } from '../lib/auth';
 import { useOrg } from '../lib/org';
 import { api, ApiError } from '../lib/api';
 import { Aviso, Button, Card, Estrelas, Input, MiniCartinha, Spinner } from '../components/ui';
+import { PainelArtilheiro } from '../components/Artilheiro';
 
 interface Membro {
   profileId: string;
@@ -138,6 +139,8 @@ export function Administradores() {
         </p>
       </div>
       {erro && <Aviso tipo="erro">{erro}</Aviso>}
+
+      {orgId && <PainelArtilheiro orgId={orgId} souDono={souDono} />}
 
       {souAdmin && (
         <Card>
