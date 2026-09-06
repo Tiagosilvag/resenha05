@@ -45,6 +45,26 @@ describe('sortearTimes', () => {
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
   });
 
+  it('equilibra times do mesmo tamanho dentro de 2 estrelas em distribuições irregulares', () => {
+    // A serpentina sozinha deixava diferenças de até 4 estrelas aqui.
+    let pior = 0;
+    for (let caso = 0; caso < 120; caso++) {
+      let a = (caso + 1) >>> 0;
+      const rand = () => {
+        a = (a * 1664525 + 1013904223) >>> 0;
+        return a / 4294967296;
+      };
+      const nTimes = 2 + (caso % 3);
+      const jogadores: JogadorSorteio[] = Array.from({ length: nTimes * 5 }, (_, i) => ({
+        profileId: `p${i}`,
+        nome: `Jogador ${i}`,
+        estrelas: 1 + Math.floor(rand() * 5),
+      }));
+      pior = Math.max(pior, amplitudeEstrelas(sortearTimes(jogadores, nTimes, { seed: caso })));
+    }
+    expect(pior).toBeLessThanOrEqual(2);
+  });
+
   it('rejeita nº de times fora de 2..32', () => {
     const jogadores = gerar({ 3: 10 });
     expect(() => sortearTimes(jogadores, 1)).toThrow();

@@ -3,6 +3,7 @@ import {
   criarConfiguracaoSchema,
   criarPeladaSchema,
   criarPeladaDaConfigSchema,
+  adicionarPresencaSchema,
   confirmarPresencaSchema,
   marcarPagamentoSchema,
   mudarStatusPeladaSchema,
@@ -275,6 +276,46 @@ export const rotasPeladas: FastifyPluginAsync = async (app) => {
       }
 
       await db.deleteFrom('peladas').where('id', '=', peladaId).execute();
+      reply.code(204);
+    });
+
+    // Admin coloca alguém na lista (quem não confirmou sozinho, o cara que
+    // avisou no grupo, etc). Só vale para quem é membro da organização.
+    r.post('/peladas/:peladaId/presencas', async (req, reply) => {
+      const { peladaId } = req.params as { peladaId: string };
+      const pelada = await orgDaPelada(req, peladaId);
+      exigirAdmin(req, pelada.organizacao_id);
+      const { profileId, status } = validar(adicionarPresencaSchema, req.body);
+
+      const membro = await db
+        .selectFrom('organizacao_membros')
+        .select('profile_id')
+        .where('organizacao_id', '=', pelada.organizacao_id)
+        .where('profile_id', '=', profileId)
+        .executeTakeFirst();
+      if (!membro) throw erro.invalido('Esse jogador não faz parte da organização.');
+
+      await db
+        .insertInto('presencas')
+        .values({ pelada_id: peladaId, profile_id: profileId, status: status ?? 'confirmado' })
+        .onConflict((oc) =>
+          oc.columns(['pelada_id', 'profile_id']).doUpdateSet({ status: status ?? 'confirmado' }),
+        )
+        .execute();
+      reply.code(201);
+      return { ok: true };
+    });
+
+    // Admin tira alguém da lista.
+    r.delete('/peladas/:peladaId/presencas/:profileId', async (req, reply) => {
+      const { peladaId, profileId } = req.params as { peladaId: string; profileId: string };
+      const pelada = await orgDaPelada(req, peladaId);
+      exigirAdmin(req, pelada.organizacao_id);
+      await db
+        .deleteFrom('presencas')
+        .where('pelada_id', '=', peladaId)
+        .where('profile_id', '=', profileId)
+        .execute();
       reply.code(204);
     });
 

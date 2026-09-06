@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../lib/auth';
 import { api, ApiError, baixarPng } from '../lib/api';
-import { Aviso, Button, Card, Chip, Estrelas, Eyebrow, MiniCartinha, Spinner, StatTile } from '../components/ui';
+import { Aviso, Button, Card, Chip, Estrelas, Eyebrow, Input, MiniCartinha, Spinner, StatTile } from '../components/ui';
 import { CartinhaModal } from '../components/Cartinha';
 
 interface Presenca {
@@ -51,6 +51,33 @@ export function Pelada() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['pelada', peladaId] }),
     onError: (e) => setErro(e instanceof ApiError ? e.message : 'Erro.'),
   });
+  const [buscaMembro, setBuscaMembro] = useState('');
+
+  // Lista da organização, para o admin colocar quem não confirmou sozinho.
+  const membros = useQuery({
+    queryKey: ['membros', data?.pelada.organizacao_id],
+    queryFn: () => api<MembroOrg[]>(`/organizacoes/${data!.pelada.organizacao_id}/membros`),
+    enabled: Boolean(admin && data?.pelada.organizacao_id),
+  });
+
+  const adicionarNaLista = useMutation({
+    mutationFn: (profileId: string) =>
+      api(`/peladas/${peladaId}/presencas`, { method: 'POST', json: { profileId } }),
+    onSuccess: () => {
+      setBuscaMembro('');
+      setErro(null);
+      qc.invalidateQueries({ queryKey: ['pelada', peladaId] });
+    },
+    onError: (e) => setErro(e instanceof ApiError ? e.message : 'Não foi possível adicionar.'),
+  });
+
+  const tirarDaLista = useMutation({
+    mutationFn: (profileId: string) =>
+      api(`/peladas/${peladaId}/presencas/${profileId}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['pelada', peladaId] }),
+    onError: (e) => setErro(e instanceof ApiError ? e.message : 'Não foi possível remover.'),
+  });
+
   const pagamento = useMutation({
     mutationFn: (v: { profileId: string; pago: boolean }) =>
       api(`/peladas/${peladaId}/pagamento`, { method: 'POST', json: v }),
@@ -74,6 +101,12 @@ export function Pelada() {
     month: 'long',
   });
   const dentro = data.minhaPresenca && data.minhaPresenca.status !== 'desistiu';
+
+  const q = buscaMembro.trim().toLowerCase();
+  const naLista = new Set(data.presencas.map((p) => p.profileId));
+  const foraDaLista = (membros.data ?? [])
+    .filter((m) => !naLista.has(m.profileId) && (m.nome ?? '').toLowerCase().includes(q))
+    .slice(0, 6);
 
   return (
     <div className="flex flex-col gap-5">
@@ -111,6 +144,43 @@ export function Pelada() {
         <Aviso>A lista desta pelada está {data.pelada.status}.</Aviso>
       )}
 
+      {admin && (
+        <Card>
+          <p className="eyebrow mb-1">Adicionar à lista</p>
+          <p className="mb-2 text-sm text-tinta-soft">
+            Coloque quem avisou por fora — só quem já é da organização.
+          </p>
+          <Input
+            placeholder="Buscar por nome"
+            value={buscaMembro}
+            onChange={(e) => setBuscaMembro(e.target.value)}
+          />
+          {buscaMembro.trim().length >= 2 && (
+            <div className="mt-2 overflow-hidden rounded-xl border border-tinta-line">
+              {foraDaLista.length === 0 && (
+                <p className="px-3 py-2.5 text-sm text-tinta-faint">
+                  Ninguém encontrado fora da lista.
+                </p>
+              )}
+              {foraDaLista.map((m) => (
+                <button
+                  key={m.profileId}
+                  type="button"
+                  disabled={adicionarNaLista.isPending}
+                  className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-campo-50 disabled:opacity-50"
+                  onClick={() => adicionarNaLista.mutate(m.profileId)}
+                >
+                  <MiniCartinha src={m.fotoUrl} nome={m.nome} recortada={m.fotoRecortada} largura={30} />
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                    {m.nome ?? 'Sem nome'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
       <section>
         <Eyebrow>Lista de presença</Eyebrow>
         {admin && (
@@ -122,12 +192,12 @@ export function Pelada() {
           {data.presencas.map((p, i) => (
             <div
               key={p.profileId}
-              className={`flex items-center gap-3 px-3.5 py-2.5 ${p.status === 'desistiu' ? 'opacity-55' : ''}`}
+              className={`flex items-center gap-2 px-3 py-2.5 ${p.status === 'desistiu' ? 'opacity-55' : ''}`}
             >
               <span className="placar-num w-5 shrink-0 text-center text-xs text-tinta-faint">{i + 1}</span>
               <button
                 type="button"
-                className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
                 onClick={() => setVerCard({ id: p.profileId, nome: p.nome })}
               >
                 <MiniCartinha src={p.fotoUrl} nome={p.nome} largura={34} recortada={p.fotoRecortada} />
@@ -156,6 +226,22 @@ export function Pelada() {
                 </button>
               ) : (
                 <Chip tom={p.status}>{p.status}</Chip>
+              )}
+              {admin && (
+                <button
+                  type="button"
+                  aria-label={`Tirar ${p.nome ?? 'jogador'} da lista`}
+                  disabled={tirarDaLista.isPending}
+                  onClick={() => {
+                    if (!confirm(`Tirar ${p.nome ?? 'este jogador'} da lista?`)) return;
+                    tirarDaLista.mutate(p.profileId);
+                  }}
+                  className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-tinta-faint transition-colors hover:bg-barro-100/60 hover:text-barro-600 disabled:opacity-50"
+                >
+                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                    <path d="M6 6l12 12M6 18 18 6" />
+                  </svg>
+                </button>
               )}
             </div>
           ))}
@@ -205,6 +291,14 @@ export function Pelada() {
   );
 }
 
+interface MembroOrg {
+  profileId: string;
+  nome: string | null;
+  telefone: string;
+  fotoUrl: string | null;
+  fotoRecortada: boolean;
+}
+
 interface TimeResultado {
   numero: number;
   totalEstrelas: number;
@@ -221,9 +315,26 @@ function PainelSorteio({
   confirmados: number;
 }) {
   const qc = useQueryClient();
-  const [nTimes, setNTimes] = useState(2);
+  const [modo, setModo] = useState<'times' | 'porTime'>('times');
+  // Texto cru: preso a um número, apagar o campo faria ele voltar ao mínimo na
+  // hora e o valor ficaria impossível de trocar.
+  const [quantidade, setQuantidade] = useState('2');
   const [erro, setErro] = useState<string | null>(null);
   const [verCard, setVerCard] = useState<{ id: string; nome: string | null } | null>(null);
+
+  const digitado = Number(quantidade);
+  const valido = quantidade !== '' && Number.isFinite(digitado) && digitado >= 1;
+  const nTimes = !valido
+    ? 0
+    : modo === 'times'
+      ? Math.max(2, Math.min(32, Math.round(digitado)))
+      : Math.max(2, Math.min(32, Math.round(confirmados / Math.round(digitado)) || 2));
+  const porTime = nTimes > 0 ? Math.round(confirmados / nTimes) : 0;
+
+  function trocarModo(novo: 'times' | 'porTime') {
+    setModo(novo);
+    setQuantidade(novo === 'times' ? '2' : '5');
+  }
 
   const atual = useQuery({
     queryKey: ['sorteio', peladaId],
@@ -250,20 +361,52 @@ function PainelSorteio({
       <p className="-mt-1 text-sm text-tinta-soft">{confirmados} confirmado(s) para dividir.</p>
       {erro && <div className="mt-2"><Aviso tipo="erro">{erro}</Aviso></div>}
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <span className="font-display text-sm font-semibold uppercase tracking-[0.03em] text-tinta-soft">Times</span>
+      <div className="mt-3 flex gap-2">
+        {(
+          [
+            ['times', 'Nº de times'],
+            ['porTime', 'Jogadores por time'],
+          ] as const
+        ).map(([valor, rotulo]) => (
+          <button
+            key={valor}
+            type="button"
+            onClick={() => trocarModo(valor)}
+            className={`flex-1 rounded-xl border px-3 py-2 font-display text-xs font-semibold uppercase tracking-[0.04em] transition-colors ${
+              modo === valor
+                ? 'border-campo-400 bg-campo-50 text-campo-800'
+                : 'border-tinta-line text-tinta-soft'
+            }`}
+          >
+            {rotulo}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center gap-2">
         <input
           type="number"
-          min={2}
+          inputMode="numeric"
+          min={modo === 'times' ? 2 : 1}
           max={32}
-          value={nTimes}
-          onChange={(e) => setNTimes(Math.max(2, Math.min(32, Number(e.target.value))))}
-          className="w-16 rounded-lg border border-tinta-line bg-white px-2 py-1.5 text-center placar-num text-base"
+          value={quantidade}
+          aria-label={modo === 'times' ? 'Número de times' : 'Jogadores por time'}
+          onChange={(e) => setQuantidade(e.target.value)}
+          onBlur={() => {
+            if (!valido) setQuantidade(modo === 'times' ? '2' : '5');
+          }}
+          className="placar-num w-20 rounded-lg border border-tinta-line bg-white px-2 py-1.5 text-center text-base"
         />
-        <Button onClick={() => sortear.mutate()} disabled={sortear.isPending}>
+        <Button onClick={() => sortear.mutate()} disabled={sortear.isPending || !valido}>
           {sortear.isPending ? <Spinner /> : times.length ? 'Re-sortear' : 'Sortear'}
         </Button>
       </div>
+
+      {valido && confirmados > 0 && (
+        <p className="mt-1.5 text-xs text-tinta-faint">
+          Vai dar {nTimes} time(s) de ~{porTime} jogador(es).
+        </p>
+      )}
 
       {sortear.data && (
         <p className="mt-2 text-xs text-tinta-faint">

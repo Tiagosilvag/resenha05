@@ -42,6 +42,12 @@ export const confirmarPresencaSchema = z.object({
   status: z.enum(['confirmado', 'desistiu']).optional(),
 });
 
+/** Admin coloca outro jogador na lista da pelada. */
+export const adicionarPresencaSchema = z.object({
+  profileId: z.string().uuid(),
+  status: z.enum(['confirmado', 'pago']).optional(),
+});
+
 /** Admin marca/desmarca quem já pagou a pelada. */
 export const marcarPagamentoSchema = z.object({
   profileId: z.string().uuid(),

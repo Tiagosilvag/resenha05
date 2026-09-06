@@ -99,6 +99,7 @@ export function sortearTimes(
     }
   }
 
+  equilibrar(times);
   return times;
 }
 
@@ -106,4 +107,49 @@ export function sortearTimes(
 export function amplitudeEstrelas(times: TimeSorteado[]): number {
   const totais = times.map((t) => t.totalEstrelas);
   return Math.max(...totais) - Math.min(...totais);
+}
+
+/**
+ * Aparo final: troca jogadores entre o time mais forte e o mais fraco enquanto
+ * isso encurtar a distância entre eles. A serpentina sozinha ainda deixa
+ * diferenças de 3–4 estrelas em distribuições irregulares.
+ *
+ * As trocas são sempre 1 por 1, então os tamanhos dos times não mudam, e a
+ * escolha é determinística — mesma semente, mesmo resultado.
+ */
+function equilibrar(times: TimeSorteado[], maxPassos = 200): void {
+  const estrela = (j: JogadorSorteio) => Math.min(5, Math.max(1, Math.round(j.estrelas)));
+
+  for (let passo = 0; passo < maxPassos; passo++) {
+    let forte = times[0]!;
+    let fraco = times[0]!;
+    for (const t of times) {
+      if (t.totalEstrelas > forte.totalEstrelas) forte = t;
+      if (t.totalEstrelas < fraco.totalEstrelas) fraco = t;
+    }
+    const distancia = forte.totalEstrelas - fraco.totalEstrelas;
+    // 1 estrela é a paridade possível quando a soma total é ímpar.
+    if (distancia <= 1) return;
+
+    let melhor: { i: number; j: number; distancia: number } | null = null;
+    for (let i = 0; i < forte.jogadores.length; i++) {
+      for (let j = 0; j < fraco.jogadores.length; j++) {
+        const ganho = estrela(forte.jogadores[i]!) - estrela(fraco.jogadores[j]!);
+        if (ganho <= 0) continue;
+        const nova = Math.abs(distancia - 2 * ganho);
+        if (nova < distancia && (!melhor || nova < melhor.distancia)) {
+          melhor = { i, j, distancia: nova };
+        }
+      }
+    }
+    if (!melhor) return;
+
+    const doForte = forte.jogadores[melhor.i]!;
+    const doFraco = fraco.jogadores[melhor.j]!;
+    forte.jogadores[melhor.i] = doFraco;
+    fraco.jogadores[melhor.j] = doForte;
+    const ganho = estrela(doForte) - estrela(doFraco);
+    forte.totalEstrelas -= ganho;
+    fraco.totalEstrelas += ganho;
+  }
 }
