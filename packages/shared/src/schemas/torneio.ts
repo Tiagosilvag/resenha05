@@ -11,7 +11,6 @@ export const TIPOS_EVENTO = [
 
 export const criarTorneioSchema = z.object({
   nome: z.string().trim().min(2).max(120),
-  formato: z.enum(FORMATOS_TORNEIO),
   times: z
     .array(z.object({ nome: z.string().trim().min(1).max(60), grupo: z.string().trim().max(20).optional() }))
     .min(2, 'Um torneio precisa de pelo menos 2 times.')
@@ -19,8 +18,19 @@ export const criarTorneioSchema = z.object({
 });
 export type CriarTorneioInput = z.infer<typeof criarTorneioSchema>;
 
+/**
+ * Fase do torneio: cada uma tem seu próprio formato — um torneio pode ter,
+ * por exemplo, uma fase de grupos (pontos corridos por grupo) seguida de um
+ * mata-mata, em vez de um formato único preso ao torneio inteiro.
+ */
+export const criarFaseSchema = z.object({
+  nome: z.string().trim().min(2, 'Dê um nome à fase.').max(60),
+  formato: z.enum(FORMATOS_TORNEIO),
+});
+export type CriarFaseInput = z.infer<typeof criarFaseSchema>;
+
 export const criarJogoSchema = z.object({
-  fase: z.string().trim().max(40).optional(),
+  faseId: z.string().uuid(),
   timeAId: z.string().uuid().nullable().optional(),
   timeBId: z.string().uuid().nullable().optional(),
   timeANome: z.string().trim().max(60).optional(),

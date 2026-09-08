@@ -1,24 +1,17 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { criarTorneioSchema, FORMATOS_TORNEIO } from '@resenha05/shared';
+import { criarTorneioSchema } from '@resenha05/shared';
 import { api, ApiError } from '../lib/api';
 import { useOrg } from '../lib/org';
-import { Aviso, Button, Card, Chip, Field, Input, Select, Spinner, Textarea } from '../components/ui';
+import { Aviso, Button, Card, Chip, Field, Input, Spinner, Textarea } from '../components/ui';
 
 interface Torneio {
   id: string;
   nome: string;
-  formato: string;
   status: string;
   criado_em: string;
 }
-
-const ROTULO_FORMATO: Record<string, string> = {
-  grupos: 'Fase de grupos',
-  mata_mata: 'Mata-mata',
-  pontos_corridos: 'Pontos corridos',
-};
 
 export function Torneios() {
   const { orgId, admin } = useOrg();
@@ -69,7 +62,6 @@ export function Torneios() {
               <Card className="flex items-center justify-between gap-3 py-3 transition-shadow hover:shadow-pop">
                 <div className="min-w-0">
                   <p className="truncate font-display font-semibold uppercase tracking-[0.02em]">{t.nome}</p>
-                  <p className="text-xs text-tinta-faint">{ROTULO_FORMATO[t.formato] ?? t.formato}</p>
                 </div>
                 <Chip tom={t.status === 'em_andamento' ? 'confirmado' : 'neutro'}>{t.status.replace('_', ' ')}</Chip>
               </Card>
@@ -84,7 +76,6 @@ export function Torneios() {
 
 function NovoTorneio({ orgId, onCriado }: { orgId: string; onCriado: () => void }) {
   const [nome, setNome] = useState('');
-  const [formato, setFormato] = useState<(typeof FORMATOS_TORNEIO)[number]>('pontos_corridos');
   const [timesTexto, setTimesTexto] = useState('');
   const [erro, setErro] = useState<string | null>(null);
 
@@ -95,7 +86,7 @@ function NovoTorneio({ orgId, onCriado }: { orgId: string; onCriado: () => void 
         .map((l) => l.trim())
         .filter(Boolean)
         .map((nome) => ({ nome }));
-      const dados = criarTorneioSchema.parse({ nome, formato, times });
+      const dados = criarTorneioSchema.parse({ nome, times });
       return api(`/organizacoes/${orgId}/torneios`, { method: 'POST', json: dados });
     },
     onSuccess: onCriado,
@@ -109,13 +100,6 @@ function NovoTorneio({ orgId, onCriado }: { orgId: string; onCriado: () => void 
         <Field label="Nome">
           <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Copa de Verão" />
         </Field>
-        <Field label="Formato">
-          <Select value={formato} onChange={(e) => setFormato(e.target.value as typeof formato)}>
-            <option value="pontos_corridos">Pontos corridos</option>
-            <option value="grupos">Fase de grupos</option>
-            <option value="mata_mata">Mata-mata</option>
-          </Select>
-        </Field>
         <Field label="Times (um por linha)">
           <Textarea
             rows={5}
@@ -124,6 +108,10 @@ function NovoTorneio({ orgId, onCriado }: { orgId: string; onCriado: () => void 
             placeholder={'Time do Zé\nAmigos da Bola\nResenha FC'}
           />
         </Field>
+        <p className="text-xs text-tinta-faint">
+          Depois de criar, adicione as fases do torneio (grupos, mata-mata…) — dá pra combinar mais de uma no
+          mesmo torneio.
+        </p>
         <Button onClick={() => criar.mutate()} disabled={criar.isPending}>
           {criar.isPending ? <Spinner /> : 'Criar torneio'}
         </Button>

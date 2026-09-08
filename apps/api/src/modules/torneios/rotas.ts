@@ -1,10 +1,12 @@
 import type { FastifyPluginAsync } from 'fastify';
 import {
   criarTorneioSchema,
+  criarFaseSchema,
   criarJogoSchema,
   registrarPlacarSchema,
   eventoSumulaSchema,
   calcularClassificacao,
+  type LinhaClassificacao,
 } from '@resenha05/shared';
 import { db } from '../../db/index.js';
 import { validar } from '../../lib/validar.js';
@@ -19,6 +21,17 @@ async function orgDoTorneio(torneioId: string): Promise<string> {
     .executeTakeFirst();
   if (!t) throw erro.naoEncontrado('Torneio não encontrado.');
   return t.organizacao_id;
+}
+
+async function orgDaFase(faseId: string): Promise<{ orgId: string; torneioId: string }> {
+  const f = await db
+    .selectFrom('torneio_fases as f')
+    .innerJoin('torneios as t', 't.id', 'f.torneio_id')
+    .select(['t.organizacao_id as orgId', 'f.torneio_id as torneioId'])
+    .where('f.id', '=', faseId)
+    .executeTakeFirst();
+  if (!f) throw erro.naoEncontrado('Fase não encontrada.');
+  return f;
 }
 
 async function orgDoJogo(jogoId: string): Promise<{ orgId: string; torneioId: string | null }> {
@@ -38,6 +51,11 @@ async function orgDoJogo(jogoId: string): Promise<{ orgId: string; torneioId: st
   return { orgId: (j.orgTorneio ?? j.orgPelada)!, torneioId: j.torneioId };
 }
 
+// Times não são divididos por fase (o mesmo elenco de times do torneio joga
+// em todas), então a classificação de uma fase é sempre calculada com todos
+// os times do torneio — só os jogos filtram pela fase.
+const FORMATOS_COM_TABELA = new Set(['grupos', 'pontos_corridos']);
+
 export const rotasTorneios: FastifyPluginAsync = async (app) => {
   app.addHook('preHandler', app.autenticar);
 
@@ -49,8 +67,8 @@ export const rotasTorneios: FastifyPluginAsync = async (app) => {
     const torneio = await db.transaction().execute(async (tx) => {
       const t = await tx
         .insertInto('torneios')
-        .values({ organizacao_id: id, nome: d.nome, formato: d.formato })
-        .returning(['id', 'nome', 'formato'])
+        .values({ organizacao_id: id, nome: d.nome })
+        .returning(['id', 'nome'])
         .executeTakeFirstOrThrow();
       await tx
         .insertInto('torneio_times')
@@ -67,10 +85,47 @@ export const rotasTorneios: FastifyPluginAsync = async (app) => {
     exigirMembro(req, id);
     return db
       .selectFrom('torneios')
-      .select(['id', 'nome', 'formato', 'status', 'criado_em'])
+      .select(['id', 'nome', 'status', 'criado_em'])
       .where('organizacao_id', '=', id)
       .orderBy('criado_em', 'desc')
       .execute();
+  });
+
+  // Cria uma fase do torneio (ex.: "Fase de grupos", "Semifinal"), cada uma
+  // com seu próprio formato — é isso que permite grupos + mata-mata juntos.
+  app.post('/torneios/:torneioId/fases', async (req, reply) => {
+    const { torneioId } = req.params as { torneioId: string };
+    exigirAdmin(req, await orgDoTorneio(torneioId));
+    const d = validar(criarFaseSchema, req.body);
+
+    const proximaOrdem = await db
+      .selectFrom('torneio_fases')
+      .select((eb) => eb.fn.coalesce(eb.fn.max('ordem'), eb.lit(-1)).as('max'))
+      .where('torneio_id', '=', torneioId)
+      .executeTakeFirst();
+
+    const fase = await db
+      .insertInto('torneio_fases')
+      .values({
+        torneio_id: torneioId,
+        nome: d.nome,
+        formato: d.formato,
+        ordem: Number(proximaOrdem?.max ?? -1) + 1,
+      })
+      .returning(['id', 'nome', 'formato', 'ordem'])
+      .executeTakeFirstOrThrow();
+    reply.code(201);
+    return fase;
+  });
+
+  // Remove a fase; os jogos que já tinha ficam de pé, só perdem o vínculo
+  // (fase_id vira null — a FK usa on delete set null).
+  app.delete('/fases/:faseId', async (req, reply) => {
+    const { faseId } = req.params as { faseId: string };
+    const { orgId } = await orgDaFase(faseId);
+    exigirAdmin(req, orgId);
+    await db.deleteFrom('torneio_fases').where('id', '=', faseId).execute();
+    reply.code(204);
   });
 
   app.get('/torneios/:torneioId', async (req) => {
@@ -78,9 +133,15 @@ export const rotasTorneios: FastifyPluginAsync = async (app) => {
     const orgId = await orgDoTorneio(torneioId);
     exigirMembro(req, orgId);
 
-    const [torneio, times, jogos] = await Promise.all([
+    const [torneio, times, fases, jogos] = await Promise.all([
       db.selectFrom('torneios').selectAll().where('id', '=', torneioId).executeTakeFirstOrThrow(),
       db.selectFrom('torneio_times').selectAll().where('torneio_id', '=', torneioId).orderBy('nome').execute(),
+      db
+        .selectFrom('torneio_fases')
+        .selectAll()
+        .where('torneio_id', '=', torneioId)
+        .orderBy('ordem')
+        .execute(),
       db
         .selectFrom('jogos')
         .selectAll()
@@ -89,17 +150,23 @@ export const rotasTorneios: FastifyPluginAsync = async (app) => {
         .execute(),
     ]);
 
-    const classificacao = calcularClassificacao(
-      times.map((t) => ({ id: t.id, nome: t.nome, grupo: t.grupo })),
-      jogos.map((j) => ({
-        timeAId: j.time_a_id,
-        timeBId: j.time_b_id,
-        placarA: j.placar_a,
-        placarB: j.placar_b,
-        status: j.status,
-      })),
-    );
-    return { torneio, times, jogos, classificacao };
+    const timesParaTabela = times.map((t) => ({ id: t.id, nome: t.nome, grupo: t.grupo }));
+    const classificacoes: Record<string, LinhaClassificacao[]> = {};
+    for (const f of fases) {
+      if (!FORMATOS_COM_TABELA.has(f.formato)) continue;
+      const jogosDaFase = jogos
+        .filter((j) => j.fase_id === f.id)
+        .map((j) => ({
+          timeAId: j.time_a_id,
+          timeBId: j.time_b_id,
+          placarA: j.placar_a,
+          placarB: j.placar_b,
+          status: j.status,
+        }));
+      classificacoes[f.id] = calcularClassificacao(timesParaTabela, jogosDaFase);
+    }
+
+    return { torneio, times, fases, jogos, classificacoes };
   });
 
   app.post('/torneios/:torneioId/encerrar', async (req) => {
@@ -113,11 +180,20 @@ export const rotasTorneios: FastifyPluginAsync = async (app) => {
     const { torneioId } = req.params as { torneioId: string };
     exigirAdmin(req, await orgDoTorneio(torneioId));
     const d = validar(criarJogoSchema, req.body);
+
+    const fase = await db
+      .selectFrom('torneio_fases')
+      .select('id')
+      .where('id', '=', d.faseId)
+      .where('torneio_id', '=', torneioId)
+      .executeTakeFirst();
+    if (!fase) throw erro.invalido('Essa fase não é deste torneio.');
+
     const jogo = await db
       .insertInto('jogos')
       .values({
         torneio_id: torneioId,
-        fase: d.fase ?? null,
+        fase_id: d.faseId,
         time_a_id: d.timeAId ?? null,
         time_b_id: d.timeBId ?? null,
         time_a_nome: d.timeANome ?? null,
@@ -152,10 +228,12 @@ export const rotasTorneios: FastifyPluginAsync = async (app) => {
         .selectFrom('jogos as j')
         .leftJoin('torneio_times as ta', 'ta.id', 'j.time_a_id')
         .leftJoin('torneio_times as tb', 'tb.id', 'j.time_b_id')
+        .leftJoin('torneio_fases as f', 'f.id', 'j.fase_id')
         .selectAll('j')
         .select((eb) => [
           eb.fn.coalesce('ta.nome', 'j.time_a_nome').as('time_a_label'),
           eb.fn.coalesce('tb.nome', 'j.time_b_nome').as('time_b_label'),
+          'f.nome as fase_nome',
         ])
         .where('j.id', '=', jogoId)
         .executeTakeFirstOrThrow(),

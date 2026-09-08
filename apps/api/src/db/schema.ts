@@ -122,7 +122,6 @@ export interface TorneiosTable {
   id: Generated<string>;
   organizacao_id: string;
   nome: string;
-  formato: 'grupos' | 'mata_mata' | 'pontos_corridos';
   status: Generated<'em_andamento' | 'encerrado' | 'cancelado'>;
   criado_em: Generated<Timestamp>;
 }
@@ -134,11 +133,21 @@ export interface TorneioTimesTable {
   grupo: string | null;
 }
 
+export interface TorneioFasesTable {
+  id: Generated<string>;
+  torneio_id: string;
+  nome: string;
+  formato: 'grupos' | 'mata_mata' | 'pontos_corridos';
+  ordem: Generated<number>;
+  criado_em: Generated<Timestamp>;
+}
+
 export interface JogosTable {
   id: Generated<string>;
   torneio_id: string | null;
   pelada_id: string | null;
   fase: string | null;
+  fase_id: string | null;
   time_a_id: string | null;
   time_b_id: string | null;
   time_a_nome: string | null;
@@ -183,6 +192,7 @@ export interface Database {
   time_jogadores: TimeJogadoresTable;
   torneios: TorneiosTable;
   torneio_times: TorneioTimesTable;
+  torneio_fases: TorneioFasesTable;
   jogos: JogosTable;
   sumula_eventos: SumulaEventosTable;
   v_eventos_jogador: VEventosJogadorView;

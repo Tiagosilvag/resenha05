@@ -17,6 +17,7 @@ interface JogoResp {
     id: string;
     torneio_id: string | null;
     organizacaoId: string;
+    fase_nome: string | null;
     time_a_label: string | null;
     time_b_label: string | null;
     placar_a: number | null;
@@ -84,9 +85,12 @@ export function Jogo() {
   return (
     <div className="flex flex-col gap-5">
       {j.torneio_id && (
-        <Link to={`/torneios/${j.torneio_id}`} className="font-display text-xs font-semibold uppercase tracking-[0.05em] text-tinta-faint">
-          ← Torneio
-        </Link>
+        <div>
+          <Link to={`/torneios/${j.torneio_id}`} className="font-display text-xs font-semibold uppercase tracking-[0.05em] text-tinta-faint">
+            ← Torneio
+          </Link>
+          {j.fase_nome && <p className="mt-1 text-sm font-medium text-tinta-soft">{j.fase_nome}</p>}
+        </div>
       )}
       {erro && <Aviso tipo="erro">{erro}</Aviso>}
 
