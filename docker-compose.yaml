@@ -1,15 +1,17 @@
 # =============================================================================
-# Resenha05 — stack completo num recurso só (Coolify: build pack "Docker Compose")
+# Resenha05 — stack num recurso só (Coolify: build pack "Docker Compose")
 # =============================================================================
-# 3 containers: banco + API + web. Um domínio, uma rede interna.
-# O nginx do "web" faz proxy de /api para o container "api" (mesma rede compose).
+# 2 containers de app (API + web) + bgremove. O Postgres NÃO sobe mais aqui —
+# fica no recurso Coolify separado "postgresql-database-geral" (banco/role
+# dedicados: resenha05 / resenha05_app), compartilhado com outros apps do
+# mesmo servidor. Ver db/migrations/ para o schema.
 #
 # No Coolify, defina estas variáveis (Environment Variables):
-#   POSTGRES_PASSWORD      senha do banco resenha05_app
-#   JWT_SECRET             openssl rand -base64 48
-#   JWT_REFRESH_SECRET     openssl rand -base64 48
-#   RESENHA05_ENC_KEY      openssl rand -base64 32   (exatamente 32 bytes)
-#   WEB_ORIGIN             https://resenha05.coffetech.com.br
+#   DATABASE_URL            postgres://resenha05_app:<senha>@host.docker.internal:5432/resenha05?sslmode=require
+#   JWT_SECRET               openssl rand -base64 48
+#   JWT_REFRESH_SECRET       openssl rand -base64 48
+#   RESENHA05_ENC_KEY        openssl rand -base64 32   (exatamente 32 bytes)
+#   WEB_ORIGIN               https://resenha05.coffetech.com.br
 #
 # As fotos de perfil ficam no volume `avatars` (servidas pela própria API).
 #
@@ -17,36 +19,15 @@
 # =============================================================================
 
 services:
-  db:
-    image: postgres:17-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: resenha05
-      POSTGRES_USER: resenha05_app
-      # OBRIGATÓRIO: defina POSTGRES_PASSWORD nas variáveis do Coolify.
-      # Sem valor, o Postgres não inicializa e o container fica unhealthy.
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}
-    volumes:
-      - db_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U resenha05_app -d resenha05 -q']
-      interval: 10s
-      timeout: 5s
-      retries: 15
-      start_period: 45s
-
   api:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
     restart: unless-stopped
-    # Ordem de start apenas; migrate.mjs espera o banco aceitar conexão.
-    depends_on:
-      - db
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: postgres://resenha05_app:${POSTGRES_PASSWORD}@db:5432/resenha05
+      DATABASE_URL: ${DATABASE_URL:?defina DATABASE_URL (postgres externo)}
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       RESENHA05_ENC_KEY: ${RESENHA05_ENC_KEY}
@@ -92,5 +73,4 @@ services:
       - '7000'
 
 volumes:
-  db_data:
   avatars:
