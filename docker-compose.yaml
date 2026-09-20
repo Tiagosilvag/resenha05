@@ -37,6 +37,11 @@ services:
       BGREMOVE_URL: http://bgremove:7000
     volumes:
       - avatars:/data/uploads
+    extra_hosts:
+      # host.docker.internal só existe por padrão no Docker Desktop. No Linux
+      # (Docker Engine puro, caso deste servidor) precisa desse mapeamento
+      # manual pra API alcançar o Postgres externo (postgresql-database-geral).
+      - host.docker.internal:host-gateway
     healthcheck:
       test:
         - CMD
