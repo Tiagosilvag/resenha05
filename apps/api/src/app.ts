@@ -18,6 +18,7 @@ import { rotasTorneios } from './modules/torneios/rotas.js';
 import { rotasEstatisticas } from './modules/estatisticas/rotas.js';
 import { rotasCartinha } from './modules/cartinha/rotas.js';
 import { rotasAdminPlataforma } from './modules/admin-plataforma/rotas.js';
+import { rotasWebhookAssinatura } from './modules/webhook-assinatura/rotas.js';
 
 export async function construirApp() {
   const app = Fastify({
@@ -80,6 +81,7 @@ export async function construirApp() {
       await api.register(rotasEstatisticas);
       await api.register(rotasCartinha);
       await api.register(rotasAdminPlataforma);
+      await api.register(rotasWebhookAssinatura);
     },
     { prefix: '/api' },
   );

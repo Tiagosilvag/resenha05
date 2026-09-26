@@ -10,6 +10,7 @@ export default defineConfig({
       JWT_SECRET: 'segredo-de-teste-com-16+',
       JWT_REFRESH_SECRET: 'refresh-de-teste-com-16+',
       PLATAFORMA_DEV_TELEFONE: '11900000000',
+      MERCADOPAGO_WEBHOOK_SECRET: 'segredo-webhook-de-teste',
     },
   },
 });
