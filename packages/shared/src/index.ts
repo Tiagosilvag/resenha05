@@ -9,6 +9,7 @@ export * from './schemas/torneio.js';
 export * from './schemas/admin-plataforma.js';
 export * from './classificacao.js';
 export * from './cartinha.js';
+export * from './assinatura.js';
 
 /** Formato do usuário logado devolvido pela API em /auth/* e /perfil. */
 export interface SessaoUsuario {
