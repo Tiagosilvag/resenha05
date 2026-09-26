@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { criarPreapproval, buscarPreapproval } from './mercadopago-preapproval.js';
+import { criarPreapproval, buscarPreapproval, MercadoPagoErro } from './mercadopago-preapproval.js';
 
 describe('criarPreapproval', () => {
   it('chama a API do MP e devolve id + link de checkout', async () => {
@@ -70,5 +70,19 @@ describe('buscarPreapproval', () => {
       valorCentavos: 4990,
     });
     expect(fetchFn.mock.calls[0][0]).toBe('https://api.mercadopago.com/preapproval/pre_123');
+  });
+});
+
+describe('MercadoPagoErro', () => {
+  it('buscarPreapproval expõe o status HTTP do MP no erro', async () => {
+    const fetchFn = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => ({ message: 'preapproval not found' }),
+    });
+    const erro = await buscarPreapproval('t', 'pre_x', fetchFn as unknown as typeof fetch).catch((e) => e);
+    expect(erro).toBeInstanceOf(MercadoPagoErro);
+    expect(erro.status).toBe(404);
+    expect(erro.message).toBe('preapproval not found');
   });
 });

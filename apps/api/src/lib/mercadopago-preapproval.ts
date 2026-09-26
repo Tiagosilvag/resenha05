@@ -21,13 +21,26 @@ export interface PreapprovalDetalhe {
 
 const BASE_URL = 'https://api.mercadopago.com/preapproval';
 
-async function corpoDeErro(resp: { json: () => Promise<unknown> }): Promise<string> {
+/** Erro devolvido pela API do MP, com o status HTTP (o webhook trata 404 à parte). */
+export class MercadoPagoErro extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = 'MercadoPagoErro';
+  }
+}
+
+async function erroDoMp(resp: { status: number; json: () => Promise<unknown> }): Promise<MercadoPagoErro> {
+  let mensagem = 'Erro desconhecido do Mercado Pago.';
   try {
     const j = (await resp.json()) as { message?: string };
-    return j.message ?? 'Erro desconhecido do Mercado Pago.';
+    if (j.message) mensagem = j.message;
   } catch {
-    return 'Erro desconhecido do Mercado Pago.';
+    // corpo não é JSON — fica a mensagem padrão
   }
+  return new MercadoPagoErro(mensagem, resp.status);
 }
 
 /** Cria uma assinatura recorrente (preapproval) no Mercado Pago. */
@@ -55,7 +68,7 @@ export async function criarPreapproval(
       },
     }),
   });
-  if (!resp.ok) throw new Error(await corpoDeErro(resp));
+  if (!resp.ok) throw await erroDoMp(resp);
   const j = (await resp.json()) as { id: string; init_point: string };
   return { id: j.id, initPoint: j.init_point };
 }
@@ -69,7 +82,7 @@ export async function buscarPreapproval(
   const resp = await fetchFn(`${BASE_URL}/${preapprovalId}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!resp.ok) throw new Error(await corpoDeErro(resp));
+  if (!resp.ok) throw await erroDoMp(resp);
   const j = (await resp.json()) as {
     id: string;
     status: PreapprovalDetalhe['status'];

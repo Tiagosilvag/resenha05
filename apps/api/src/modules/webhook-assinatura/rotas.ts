@@ -1,10 +1,11 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { interpretarStatusPreapproval } from '@resenha05/shared';
+import { derivarStatusOrganizacao } from '@resenha05/shared';
 import { db } from '../../db/index.js';
 import { env } from '../../env.js';
 import { verificarAssinaturaWebhook } from '../../lib/mercadopago-webhook.js';
 import { buscarPreapproval } from '../../lib/mercadopago-preapproval.js';
 import { decifrarToken } from '../../lib/cripto.js';
+import { processarPreapproval } from './processar.js';
 
 export const rotasWebhookAssinatura: FastifyPluginAsync = async (app) => {
   app.post('/webhooks/mercadopago/assinatura', async (req, reply) => {
@@ -50,41 +51,58 @@ export const rotasWebhookAssinatura: FastifyPluginAsync = async (app) => {
     }
     const tokenGeral = decifrarToken(cfg.mp_geral_token_cipher, cfg.mp_geral_token_nonce);
 
-    const detalhe = await buscarPreapproval(tokenGeral, dataId);
-    const [organizacaoId, periodoReferencia] = detalhe.externalReference.split(':');
-    if (!organizacaoId || !periodoReferencia) {
-      req.log.error(`external_reference inesperado no preapproval ${dataId}: ${detalhe.externalReference}`);
-      reply.code(200);
-      return { ok: true };
-    }
+    const resultado = await processarPreapproval(dataId, {
+      carregarAssinatura: async (preapprovalId) => {
+        const a = await db
+          .selectFrom('assinaturas')
+          .select(['organizacao_id', 'periodo_referencia'])
+          .where('mp_preapproval_id', '=', preapprovalId)
+          .orderBy('criado_em')
+          .executeTakeFirst();
+        return a ? { organizacaoId: a.organizacao_id, periodoReferencia: a.periodo_referencia } : null;
+      },
+      buscarPreapproval: (preapprovalId) => buscarPreapproval(tokenGeral, preapprovalId),
+      aplicar: (e) =>
+        db.transaction().execute(async (tx) => {
+          await tx
+            .insertInto('assinaturas')
+            .values({
+              organizacao_id: e.organizacaoId,
+              mp_preapproval_id: e.preapprovalId,
+              periodo_referencia: e.periodoReferencia,
+              valor_centavos: e.valorCentavos,
+              status: e.statusCiclo,
+            })
+            .onConflict((oc) =>
+              oc.columns(['mp_preapproval_id', 'periodo_referencia']).doUpdateSet({
+                status: e.statusCiclo,
+                valor_centavos: e.valorCentavos,
+                atualizado_em: new Date(),
+              }),
+            )
+            .execute();
 
-    const { statusAssinatura, statusCiclo } = interpretarStatusPreapproval(detalhe.status);
-
-    await db.transaction().execute(async (tx) => {
-      await tx
-        .insertInto('assinaturas')
-        .values({
-          organizacao_id: organizacaoId,
-          mp_preapproval_id: dataId,
-          periodo_referencia: periodoReferencia,
-          valor_centavos: detalhe.valorCentavos,
-          status: statusCiclo,
-        })
-        .onConflict((oc) =>
-          oc.columns(['mp_preapproval_id', 'periodo_referencia']).doUpdateSet({
-            status: statusCiclo,
-            valor_centavos: detalhe.valorCentavos,
-            atualizado_em: new Date(),
-          }),
-        )
-        .execute();
-
-      await tx
-        .updateTable('organizacoes')
-        .set({ status_assinatura: statusAssinatura })
-        .where('id', '=', organizacaoId)
-        .execute();
+          // Outra assinatura aprovada da mesma organização vale mais que este evento.
+          const ciclos = await tx
+            .selectFrom('assinaturas')
+            .select('status')
+            .where('organizacao_id', '=', e.organizacaoId)
+            .execute();
+          await tx
+            .updateTable('organizacoes')
+            .set({
+              status_assinatura: derivarStatusOrganizacao(
+                e.statusAssinaturaEvento,
+                ciclos.map((c) => c.status),
+              ),
+            })
+            .where('id', '=', e.organizacaoId)
+            .execute();
+        }),
     });
+    if (resultado === 'ignorado') {
+      req.log.warn(`Webhook de assinatura ignorado (preapproval desconhecido ou inexistente no MP): ${dataId}`);
+    }
 
     reply.code(200);
     return { ok: true };

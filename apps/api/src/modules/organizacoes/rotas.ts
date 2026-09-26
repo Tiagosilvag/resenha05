@@ -7,6 +7,7 @@ import {
   adicionarMembroSchema,
   removerMembroSchema,
   conectarMercadoPagoSchema,
+  podeIniciarCheckout,
 } from '@resenha05/shared';
 import { db } from '../../db/index.js';
 import { validar } from '../../lib/validar.js';
@@ -14,7 +15,7 @@ import { erro } from '../../lib/erros.js';
 import { exigirAdmin, exigirDono, exigirMembro } from '../../plugins/auth.js';
 import { cifrarToken, decifrarToken } from '../../lib/cripto.js';
 import { criarPreapproval } from '../../lib/mercadopago-preapproval.js';
-import { exigirOrganizacaoLiberada } from '../../lib/assinatura.js';
+import { exigirOrganizacaoLiberada, traduzirErroCobranca } from '../../lib/assinatura.js';
 import { primeiroDiaDoMesUtc } from '../../lib/periodo.js';
 import { env } from '../../env.js';
 
@@ -317,10 +318,13 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
 
     const org = await db
       .selectFrom('organizacoes')
-      .select(['id', 'nome'])
+      .select(['id', 'nome', 'status_assinatura'])
       .where('id', '=', id)
       .executeTakeFirst();
     if (!org) throw erro.naoEncontrado('Organização não encontrada.');
+    if (!podeIniciarCheckout(org.status_assinatura)) {
+      throw erro.conflito('Esta organização já está com a mensalidade em dia.');
+    }
 
     const cfg = await db
       .selectFrom('plataforma_config')
@@ -332,20 +336,26 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
       throw erro.invalido('Conta Mercado Pago da plataforma ainda não configurada.');
     }
 
-    const tokenGeral = decifrarToken(cfg.mp_geral_token_cipher, cfg.mp_geral_token_nonce);
     const periodoStr = primeiroDiaDoMesUtc(new Date());
 
     // O MP exige um e-mail no preapproval, mas o cadastro não coleta e-mail do
     // dono: usa um sintético só para satisfazer o campo (quem interage é o
     // dono, dentro do checkout do MP).
-    const preapproval = await criarPreapproval({
-      accessToken: tokenGeral,
-      reason: `Mensalidade Resenha05 - ${org.nome}`,
-      externalReference: `${org.id}:${periodoStr}`,
-      payerEmail: req.usuario.telefone.replace(/\D/g, '') + '@resenha05.invalid',
-      valorCentavos: cfg.mensalidade_valor_centavos,
-      backUrl: `${env.WEB_ORIGIN}/organizacoes/${org.id}`,
-    });
+    let preapproval;
+    try {
+      const tokenGeral = decifrarToken(cfg.mp_geral_token_cipher, cfg.mp_geral_token_nonce);
+      preapproval = await criarPreapproval({
+        accessToken: tokenGeral,
+        reason: `Mensalidade Resenha05 - ${org.nome}`,
+        externalReference: `${org.id}:${periodoStr}`,
+        payerEmail: req.usuario.telefone.replace(/\D/g, '') + '@resenha05.invalid',
+        valorCentavos: cfg.mensalidade_valor_centavos,
+        backUrl: `${env.WEB_ORIGIN}/organizacoes/${org.id}`,
+      });
+    } catch (e) {
+      req.log.error({ err: e }, 'Falha ao criar a assinatura no Mercado Pago');
+      throw traduzirErroCobranca(e);
+    }
 
     await db
       .insertInto('assinaturas')
