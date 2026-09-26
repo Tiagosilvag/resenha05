@@ -29,7 +29,13 @@ const schema = z.object({
   BGREMOVE_URL: z.string().url().optional(),
 
   N8N_PAGAMENTO_WEBHOOK_URL: z.string().url().optional(),
-  MERCADOPAGO_PLATAFORMA_TOKEN: z.string().optional(),
+  // Telefone canônico (+55DDDXXXXXXXXX) da conta "dev" — único que cadastra
+  // ou remove admins de plataforma. Ver apps/api/src/plugins/auth.ts.
+  PLATAFORMA_DEV_TELEFONE: z.string().min(10, 'PLATAFORMA_DEV_TELEFONE é obrigatória.'),
+
+  // Segredo do webhook de assinatura no painel do Mercado Pago — valida o
+  // header x-signature. Sem isso, o endpoint de webhook recusa tudo.
+  MERCADOPAGO_WEBHOOK_SECRET: z.string().optional(),
 
   // Token compartilhado para o n8n chamar endpoints internos. Se vazio,
   // esses endpoints exigem login de admin.
