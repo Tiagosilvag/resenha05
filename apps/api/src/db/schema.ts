@@ -178,6 +178,34 @@ export interface VEventosJogadorView {
   organizacao_id: string | null;
 }
 
+export interface PlataformaAdminsTable {
+  id: Generated<string>;
+  profile_id: string;
+  cadastrado_por: string;
+  criado_em: Generated<Timestamp>;
+}
+
+export interface PlataformaConfigTable {
+  id: Generated<number>;
+  mensalidade_valor_centavos: number;
+  mp_geral_token_cipher: Buffer | null;
+  mp_geral_token_nonce: Buffer | null;
+  mp_geral_token_atualizado_em: Timestamp | null;
+  atualizado_em: Generated<Timestamp>;
+}
+
+export interface AssinaturasTable {
+  id: Generated<string>;
+  organizacao_id: string;
+  mp_preapproval_id: string;
+  mp_payment_id: string | null;
+  periodo_referencia: ColumnType<string, string, string>;
+  valor_centavos: number;
+  status: 'pendente' | 'aprovado' | 'atrasado' | 'cancelado';
+  criado_em: Generated<Timestamp>;
+  atualizado_em: Generated<Timestamp>;
+}
+
 export interface Database {
   profiles: ProfilesTable;
   sessoes: SessoesTable;
@@ -196,4 +224,7 @@ export interface Database {
   jogos: JogosTable;
   sumula_eventos: SumulaEventosTable;
   v_eventos_jogador: VEventosJogadorView;
+  plataforma_admins: PlataformaAdminsTable;
+  plataforma_config: PlataformaConfigTable;
+  assinaturas: AssinaturasTable;
 }
