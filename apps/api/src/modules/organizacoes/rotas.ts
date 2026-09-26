@@ -12,7 +12,10 @@ import { db } from '../../db/index.js';
 import { validar } from '../../lib/validar.js';
 import { erro } from '../../lib/erros.js';
 import { exigirAdmin, exigirDono, exigirMembro } from '../../plugins/auth.js';
-import { cifrarToken } from '../../lib/cripto.js';
+import { cifrarToken, decifrarToken } from '../../lib/cripto.js';
+import { criarPreapproval } from '../../lib/mercadopago-preapproval.js';
+import { primeiroDiaDoMesUtc } from '../../lib/periodo.js';
+import { env } from '../../env.js';
 
 function ehViolacaoDeCheck(e: unknown): boolean {
   return (e as { code?: string }).code === '23514';
@@ -295,5 +298,62 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
       .where('id', '=', id)
       .execute();
     return { ok: true };
+  });
+
+  // Dono inicia o pagamento da mensalidade (cria a assinatura recorrente no MP).
+  app.post('/organizacoes/:id/assinatura/checkout', async (req) => {
+    const { id } = req.params as { id: string };
+    exigirDono(req, id);
+
+    const org = await db
+      .selectFrom('organizacoes')
+      .select(['id', 'nome'])
+      .where('id', '=', id)
+      .executeTakeFirst();
+    if (!org) throw erro.naoEncontrado('Organização não encontrada.');
+
+    const cfg = await db
+      .selectFrom('plataforma_config')
+      .select(['mensalidade_valor_centavos', 'mp_geral_token_cipher', 'mp_geral_token_nonce'])
+      .where('id', '=', 1)
+      .executeTakeFirstOrThrow();
+
+    if (!cfg.mp_geral_token_cipher || !cfg.mp_geral_token_nonce) {
+      throw erro.invalido('Conta Mercado Pago da plataforma ainda não configurada.');
+    }
+
+    const tokenGeral = decifrarToken(cfg.mp_geral_token_cipher, cfg.mp_geral_token_nonce);
+    const periodoStr = primeiroDiaDoMesUtc(new Date());
+
+    // O MP exige um e-mail no preapproval, mas o cadastro não coleta e-mail do
+    // dono: usa um sintético só para satisfazer o campo (quem interage é o
+    // dono, dentro do checkout do MP).
+    const preapproval = await criarPreapproval({
+      accessToken: tokenGeral,
+      reason: `Mensalidade Resenha05 - ${org.nome}`,
+      externalReference: `${org.id}:${periodoStr}`,
+      payerEmail: req.usuario.telefone.replace(/\D/g, '') + '@resenha05.invalid',
+      valorCentavos: cfg.mensalidade_valor_centavos,
+      backUrl: `${env.WEB_ORIGIN}/organizacoes/${org.id}`,
+    });
+
+    await db
+      .insertInto('assinaturas')
+      .values({
+        organizacao_id: org.id,
+        mp_preapproval_id: preapproval.id,
+        periodo_referencia: periodoStr,
+        valor_centavos: cfg.mensalidade_valor_centavos,
+        status: 'pendente',
+      })
+      .onConflict((oc) =>
+        oc.columns(['mp_preapproval_id', 'periodo_referencia']).doUpdateSet({
+          valor_centavos: cfg.mensalidade_valor_centavos,
+          atualizado_em: new Date(),
+        }),
+      )
+      .execute();
+
+    return { checkoutUrl: preapproval.initPoint };
   });
 };
