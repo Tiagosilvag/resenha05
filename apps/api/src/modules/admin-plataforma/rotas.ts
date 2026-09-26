@@ -1,7 +1,11 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { configurarMensalidadeSchema, conectarMercadoPagoGeralSchema } from '@resenha05/shared';
+import {
+  cadastrarAdminPlataformaSchema,
+  configurarMensalidadeSchema,
+  conectarMercadoPagoGeralSchema,
+} from '@resenha05/shared';
 import { db } from '../../db/index.js';
-import { exigirAdminPlataforma } from '../../plugins/auth.js';
+import { exigirAdminPlataforma, exigirDev } from '../../plugins/auth.js';
 import { validar } from '../../lib/validar.js';
 import { erro } from '../../lib/erros.js';
 import { cifrarToken } from '../../lib/cripto.js';
@@ -90,5 +94,66 @@ export const rotasAdminPlataforma: FastifyPluginAsync = async (app) => {
       .where('id', '=', 1)
       .execute();
     return { ok: true };
+  });
+
+  app.get('/admin/plataforma-admins', async () => {
+    return db
+      .selectFrom('plataforma_admins as pa')
+      .innerJoin('profiles as p', 'p.id', 'pa.profile_id')
+      .select(['pa.id as id', 'p.id as profileId', 'p.nome as nome', 'p.telefone as telefone', 'pa.criado_em as criadoEm'])
+      .orderBy('pa.criado_em')
+      .execute();
+  });
+
+  // Busca candidatos a admin de plataforma (exclui quem já é).
+  app.get('/admin/plataforma-admins/buscar', async (req) => {
+    exigirDev(req);
+    const q = ((req.query as { q?: string }).q ?? '').trim();
+    if (q.length < 2) return [];
+    const digitos = q.replace(/\D/g, '');
+
+    return db
+      .selectFrom('profiles as p')
+      .leftJoin('plataforma_admins as pa', 'pa.profile_id', 'p.id')
+      .select(['p.id as profileId', 'p.nome as nome', 'p.telefone as telefone'])
+      .where('pa.id', 'is', null)
+      .where((eb) => {
+        const condicoes = [eb('p.nome', 'ilike', `%${q}%`)];
+        if (digitos.length > 0) condicoes.push(eb('p.telefone', 'like', `%${digitos}%`));
+        return eb.or(condicoes);
+      })
+      .orderBy('p.nome')
+      .limit(6)
+      .execute();
+  });
+
+  app.post('/admin/plataforma-admins', async (req, reply) => {
+    exigirDev(req);
+    const { profileId } = validar(cadastrarAdminPlataformaSchema, req.body);
+
+    const existe = await db.selectFrom('profiles').select('id').where('id', '=', profileId).executeTakeFirst();
+    if (!existe) throw erro.naoEncontrado('Perfil não encontrado.');
+
+    try {
+      await db
+        .insertInto('plataforma_admins')
+        .values({ profile_id: profileId, cadastrado_por: req.usuario.id })
+        .execute();
+    } catch (e) {
+      if ((e as { code?: string }).code === '23505') {
+        throw erro.conflito('Essa pessoa já é admin de plataforma.');
+      }
+      throw e;
+    }
+    reply.code(201);
+    return { ok: true };
+  });
+
+  app.delete('/admin/plataforma-admins/:id', async (req, reply) => {
+    exigirDev(req);
+    const { id } = req.params as { id: string };
+    const r = await db.deleteFrom('plataforma_admins').where('id', '=', id).executeTakeFirst();
+    if (r.numDeletedRows === 0n) throw erro.naoEncontrado('Admin de plataforma não encontrado.');
+    reply.code(204);
   });
 };
