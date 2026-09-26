@@ -18,6 +18,28 @@ export async function logoDataUri(): Promise<string> {
   return logoCache;
 }
 
+const escudoCache = new Map<string, { uri: string; w: number; h: number } | null>();
+/**
+ * Escudo oficial do time, se alguém colocou o PNG em apps/api/assets/escudos/<id>.png
+ * (o repositório não traz escudos — são marca registrada). Devolve também as
+ * dimensões, porque o satori exige width e height na <img>.
+ */
+export async function escudoDataUri(id: string): Promise<{ uri: string; w: number; h: number } | null> {
+  if (escudoCache.has(id)) return escudoCache.get(id) ?? null;
+  let r: { uri: string; w: number; h: number } | null = null;
+  if (/^[a-z0-9-]+$/.test(id)) {
+    try {
+      const buf = await readFile(join(aqui, '..', '..', 'assets', 'escudos', `${id}.png`));
+      // PNG: largura e altura ficam nos bytes 16–23 do cabeçalho
+      r = { uri: `data:image/png;base64,${buf.toString('base64')}`, w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
+    } catch {
+      r = null;
+    }
+  }
+  escudoCache.set(id, r);
+  return r;
+}
+
 export const PALETA = {
   ouro: '#E7C158',
   ouroEscuro: '#B9902F',

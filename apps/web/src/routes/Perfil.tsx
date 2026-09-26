@@ -7,6 +7,7 @@ import { api, ApiError } from '../lib/api';
 import { enviarFoto } from '../lib/foto';
 import { Avatar, Aviso, Button, Card, Eyebrow, Field, Input, Spinner } from '../components/ui';
 import { Cartinha } from '../components/Cartinha';
+import { SeletorTime } from '../components/SeletorTime';
 
 export function Perfil() {
   const { usuario, recarregar, sair } = useAuth();
@@ -117,7 +118,7 @@ export function Perfil() {
             orgId={orgId}
             nome={usuario.nome}
             baixavel
-            chave={`${usuario.fotoUrl ?? ''}|${usuario.fotoRecortada ? 1 : 0}`}
+            chave={`${usuario.fotoUrl ?? ''}|${usuario.fotoRecortada ? 1 : 0}|${usuario.timeCoracao ?? ''}`}
           />
         </section>
       )}
@@ -131,7 +132,7 @@ export function Perfil() {
             <Input value={formatarTelefone(usuario?.telefone ?? '')} disabled />
           </Field>
           <Field label="Time do coração">
-            <Input value={timeCoracao} onChange={(e) => setTimeCoracao(e.target.value)} />
+            <SeletorTime value={timeCoracao} onChange={setTimeCoracao} />
           </Field>
           <Button onClick={salvar} disabled={salvando}>
             {salvando ? <Spinner /> : 'Salvar'}
