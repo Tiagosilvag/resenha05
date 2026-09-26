@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import type { SessaoUsuario } from '@resenha05/shared';
+import { ehTelefoneDev, type SessaoUsuario } from '@resenha05/shared';
 import { db } from '../db/index.js';
 import { env } from '../env.js';
 import { sha256 } from './cripto.js';
@@ -33,6 +33,8 @@ export async function carregarUsuario(profileId: string): Promise<SessaoUsuario>
     .orderBy('o.nome')
     .execute();
 
+  const papelPlataforma = await resolverPapelPlataforma(p.telefone, profileId);
+
   return {
     id: p.id,
     nome: p.nome,
@@ -48,7 +50,22 @@ export async function carregarUsuario(profileId: string): Promise<SessaoUsuario>
       papel: o.papel,
       estrelas: o.estrelas,
     })),
+    papelPlataforma,
   };
+}
+
+/** 'dev' bate por telefone (env); 'admin' bate por linha em plataforma_admins. */
+async function resolverPapelPlataforma(
+  telefoneCanonico: string,
+  profileId: string,
+): Promise<'dev' | 'admin' | null> {
+  if (ehTelefoneDev(telefoneCanonico, env.PLATAFORMA_DEV_TELEFONE)) return 'dev';
+  const admin = await db
+    .selectFrom('plataforma_admins')
+    .select('id')
+    .where('profile_id', '=', profileId)
+    .executeTakeFirst();
+  return admin ? 'admin' : null;
 }
 
 export interface ParDeTokens {

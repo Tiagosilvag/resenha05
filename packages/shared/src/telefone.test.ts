@@ -4,6 +4,7 @@ import {
   telefoneCelularValido,
   normalizarTelefone,
   formatarTelefone,
+  ehTelefoneDev,
 } from './telefone.js';
 
 describe('mascararTelefone', () => {
@@ -46,5 +47,16 @@ describe('telefoneCelularValido', () => {
     const canon = normalizarTelefone('(11) 99123-4567');
     expect(canon).toBe('+5511991234567');
     expect(formatarTelefone(canon)).toBe('(11) 99123-4567');
+  });
+});
+
+describe('ehTelefoneDev', () => {
+  it('bate mesmo se o env tiver o telefone em formato solto', () => {
+    expect(ehTelefoneDev('+5511912345678', '11 91234-5678')).toBe(true);
+    expect(ehTelefoneDev('+5511912345678', '+5511912345678')).toBe(true);
+  });
+
+  it('não bate para telefone diferente', () => {
+    expect(ehTelefoneDev('+5511912345678', '11 90000-0000')).toBe(false);
   });
 });

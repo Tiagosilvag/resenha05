@@ -15,6 +15,11 @@ export function normalizarTelefone(entrada: string): string {
   return t;
 }
 
+/** Compara um telefone já canônico com o valor cru de PLATAFORMA_DEV_TELEFONE. */
+export function ehTelefoneDev(telefoneCanonico: string, devTelefoneEnv: string): boolean {
+  return telefoneCanonico === normalizarTelefone(devTelefoneEnv);
+}
+
 export function telefoneValido(entrada: string): boolean {
   return CANONICO.test(normalizarTelefone(entrada));
 }

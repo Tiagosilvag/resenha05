@@ -21,6 +21,7 @@ export interface SessaoUsuario {
   timeCoracao: string | null;
   telefoneVerificado: boolean;
   organizacoes: OrganizacaoDoUsuario[];
+  papelPlataforma: 'dev' | 'admin' | null;
 }
 
 export interface OrganizacaoDoUsuario {
