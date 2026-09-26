@@ -72,13 +72,22 @@ atualizado_em         timestamptz, default now()
 ```
 
 ### Coluna reaproveitada `organizacoes.status_assinatura`
-Já existe (`Generated<string>`, sem uso hoje). Passa a valer:
-`'trial' | 'ativa' | 'vencida'`.
+Já existe, com CHECK constraint já definido em `db/migrations/0001_core.sql`:
+`text not null default 'trial' check (status_assinatura in ('trial','ativa','inadimplente','cancelada'))`.
+Nenhuma migration nova precisa mexer nessa constraint — os 4 valores que já
+existem cobrem exatamente o que este spec precisa:
+- `trial` — organização nova, nunca pagou.
+- `ativa` — mensalidade em dia.
+- `inadimplente` — ciclo vigente não foi pago (preapproval existe mas o
+  pagamento do mês falhou ou está pendente).
+- `cancelada` — o dono cancelou a assinatura recorrente no Mercado Pago (ou
+  o MP cancelou por falhas repetidas).
 
 **Migração de dados:** todas as organizações com `criado_em` anterior à data
 de deploy deste spec recebem `status_assinatura = 'ativa'` direto na
 migration SQL (grandfathered, conforme decidido — não pagam agora).
-Organizações criadas depois do deploy nascem em `'trial'`.
+Organizações criadas depois do deploy nascem em `'trial'` (já é o default da
+coluna, nenhuma mudança necessária aí).
 
 ## Fluxo de assinatura (Mercado Pago Preapproval)
 
@@ -90,18 +99,22 @@ Usa a API de assinaturas recorrentes do Mercado Pago (preapproval), vinculada
    `organizacoes`).
 2. Admin de plataforma configura `mensalidade_valor_centavos` (editável a
    qualquer momento; só vale pra cobranças futuras, não retroage).
-3. Quando o dono de uma organização em `trial` ou `vencida` inicia o
-   pagamento, a API cria um preapproval no Mercado Pago (usando o token da
-   conta geral) com o valor atual de `plataforma_config` e devolve o link de
-   checkout do MP. Dono é redirecionado, autoriza a cobrança recorrente no
-   cartão.
+3. Quando o dono de uma organização em `trial`, `inadimplente` ou
+   `cancelada` inicia o pagamento, a API cria um preapproval no Mercado Pago
+   (usando o token da conta geral) com o valor atual de `plataforma_config`
+   e devolve o link de checkout do MP. Dono é redirecionado, autoriza a
+   cobrança recorrente no cartão.
 4. Webhook do MP (`POST /webhooks/mercadopago/assinatura`, novo endpoint)
-   recebe eventos de aprovação/atraso/cancelamento do preapproval:
-   - `authorized` → grava/atualiza linha em `assinaturas` com
-     `status='aprovado'`, e `organizacoes.status_assinatura = 'ativa'`.
-   - `cancelled` ou falha de cobrança do ciclo → `assinaturas.status`
-     atualizado; se o ciclo vigente não foi pago, `organizacoes.status_assinatura
-     = 'vencida'`.
+   recebe eventos do preapproval:
+   - `authorized` (cobrança do ciclo aprovada) → grava/atualiza linha em
+     `assinaturas` com `status='aprovado'`, e `organizacoes.status_assinatura
+     = 'ativa'`.
+   - Pagamento do ciclo pendente ou recusado, com o preapproval ainda ativo
+     → `assinaturas.status = 'atrasado'`, `organizacoes.status_assinatura =
+     'inadimplente'`.
+   - `cancelled` (preapproval cancelado, pelo dono ou pelo MP) →
+     `assinaturas.status = 'cancelado'`, `organizacoes.status_assinatura =
+     'cancelada'`.
 5. Processamento do webhook é idempotente por `mp_preapproval_id` +
    `periodo_referencia` (mesmo padrão de upsert usado noutros pontos do
    código pra webhooks externos).
@@ -191,9 +204,10 @@ Seguindo o padrão já usado em `packages/shared/src/sorteio.test.ts`:
 - Checkout pix/cartão da taxa da pelada (sub-projeto B).
 - Balanço financeiro e lista de inadimplentes (sub-projeto C).
 - Limite de quantidade de admins de plataforma (não foi pedido).
-- Grace period configurável antes de marcar `vencida` (o corte é direto:
-  ciclo não pago vira `vencida` no evento do MP; se depois quiser um prazo
-  de tolerância, é mudança pequena e isolada nesse mesmo fluxo).
+- Grace period configurável antes de marcar `inadimplente` (o corte é
+  direto: ciclo não pago vira `inadimplente` no evento do MP; se depois
+  quiser um prazo de tolerância, é mudança pequena e isolada nesse mesmo
+  fluxo).
 - Notificação (WhatsApp/e-mail) avisando o dono que a mensalidade está
   vencendo ou venceu — hoje ele só descobre ao tentar entrar por código ou
   criar pelada e levar o erro.
