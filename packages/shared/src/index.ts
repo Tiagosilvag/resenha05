@@ -6,6 +6,7 @@ export * from './schemas/perfil.js';
 export * from './schemas/organizacao.js';
 export * from './schemas/pelada.js';
 export * from './schemas/torneio.js';
+export * from './schemas/admin-plataforma.js';
 export * from './classificacao.js';
 export * from './cartinha.js';
 
