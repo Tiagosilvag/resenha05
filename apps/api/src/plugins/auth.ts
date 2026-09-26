@@ -59,3 +59,15 @@ export function exigirDono(req: FastifyRequest, orgId: string): OrganizacaoDoUsu
   }
   return vinculo;
 }
+
+export function exigirAdminPlataforma(req: FastifyRequest): void {
+  if (req.usuario.papelPlataforma == null) {
+    throw erro.proibido('Ação restrita a administradores da plataforma.');
+  }
+}
+
+export function exigirDev(req: FastifyRequest): void {
+  if (req.usuario.papelPlataforma !== 'dev') {
+    throw erro.proibido('Ação restrita ao desenvolvedor da plataforma.');
+  }
+}
