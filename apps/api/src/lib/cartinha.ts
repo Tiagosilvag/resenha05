@@ -2,7 +2,11 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   ATRIBUTOS_CARTA,
-  coresDoTime,
+  acharTime,
+  coresDoTemaTime,
+  luminancia,
+  siglaTime,
+  temaDoTime,
   ROTULO_ATRIBUTO,
   calcularAtributos,
   selo,
@@ -11,7 +15,8 @@ import {
   type Posicao,
 } from '@resenha05/shared';
 import { UPLOADS_DIR } from './uploads.js';
-import { PALETA, h, elementoParaPng, logoDataUri, type El } from './satori-base.js';
+import { PALETA, h, elementoParaPng, logoDataUri, escudoDataUri, type El } from './satori-base.js';
+import { gradientePadrao } from './padrao-camisa.js';
 
 const { creme: CRE, dim: DIM } = PALETA;
 
@@ -71,7 +76,11 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
   const pos = selo(dados.posicao as Posicao | null);
   const pe = seloPe(dados.pePreferido);
   const estrelas = Math.min(5, Math.max(1, Math.round(dados.estrelas || 3)));
-  const { brilho, fundo, contorno } = coresDoTime(dados.timeCoracao);
+  // tema do time do coração: cores + desenho da camisa (sem time = ouro da casa)
+  const timeReconhecido = acharTime(dados.timeCoracao);
+  const tema = temaDoTime(dados.timeCoracao);
+  const { brilho, fundo, contorno } = coresDoTemaTime(tema);
+  const padraoCamisa = timeReconhecido ? gradientePadrao(tema) : null;
 
   const stat = (a: (typeof ATRIBUTOS_CARTA)[number]): El =>
     h(
@@ -109,8 +118,16 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
         },
       }),
     ),
+    // desenho da camisa do time (listras, aros, metades, faixa)
+    ...(padraoCamisa
+      ? [
+          h('div', {
+            style: { position: 'absolute', display: 'flex', left: 0, top: 0, width: L, height: A, backgroundImage: padraoCamisa },
+          }),
+        ]
+      : []),
     // faixas diagonais, no mesmo espírito do fundo do app
-    ...Array.from({ length: 9 }, (_, i) =>
+    ...Array.from({ length: padraoCamisa ? 0 : 9 }, (_, i) =>
       h('div', {
         style: {
           position: 'absolute',
@@ -304,7 +321,8 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
   const infoInferior: El[] = [
     h('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: recortada ? 0 : 14 } },
       h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 800, fontSize: 54, color: brilho, textAlign: 'center', lineHeight: 1 } }, nome),
-      h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 20, color: DIM, letterSpacing: 3, marginTop: 6 } }, 'RESENHA 05'),
+      h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 20, color: DIM, letterSpacing: 3, marginTop: 6 } },
+        timeReconhecido ? `${tema.nome.toUpperCase()} · RESENHA 05` : 'RESENHA 05'),
     ),
     h('div', { style: { display: 'flex', width: 430, height: 3, backgroundColor: contorno, marginTop: 16, marginBottom: 14 } }),
     h('div', { style: { display: 'flex', width: 430, justifyContent: 'space-between', marginBottom: 20 } }, ...ATRIBUTOS_CARTA.map(stat)),
@@ -328,9 +346,69 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
     ...infoInferior,
   );
 
+  // Escudo do time abaixo de OVR/posição, à esquerda (como nas cartas FUT).
+  // Usa o PNG oficial se existir em assets/escudos/<id>.png; senão desenha um
+  // escudo nas cores do time com a sigla.
+  const escudoOficial = timeReconhecido ? await escudoDataUri(tema.id) : null;
+  const distintivo: El[] = timeReconhecido
+    ? [
+        h(
+          'div',
+          { style: { display: 'flex', position: 'absolute', left: 54, top: 226 } },
+          escudoOficial
+            ? h('img', {
+                src: escudoOficial.uri,
+                style: {
+                  width: Math.round(escudoOficial.w * Math.min(52 / escudoOficial.w, 62 / escudoOficial.h)),
+                  height: Math.round(escudoOficial.h * Math.min(52 / escudoOficial.w, 62 / escudoOficial.h)),
+                },
+              })
+            : h(
+                'div',
+                {
+                  style: {
+                    display: 'flex',
+                    flexDirection: 'column',
+                    width: 52,
+                    height: 62,
+                    borderRadius: '7px 7px 28px 28px',
+                    border: `3px solid ${brilho}`,
+                    overflow: 'hidden',
+                    backgroundColor: tema.primaria,
+                  },
+                },
+                h(
+                  'div',
+                  { style: { display: 'flex', flexGrow: 1, alignItems: 'center', justifyContent: 'center' } },
+                  h(
+                    'span',
+                    {
+                      style: {
+                        fontFamily: 'Barlow Condensed',
+                        fontWeight: 800,
+                        fontSize: 22,
+                        letterSpacing: 1,
+                        color: luminancia(tema.primaria) > 0.3 ? '#141414' : '#FFFFFF',
+                      },
+                    },
+                    siglaTime(tema),
+                  ),
+                ),
+                h(
+                  'div',
+                  { style: { display: 'flex', height: 16 } },
+                  ...[tema.secundaria, tema.terciaria]
+                    .filter((c): c is string => Boolean(c))
+                    .map((c, i) => h('div', { key: i, style: { display: 'flex', flexGrow: 1, backgroundColor: c } })),
+                ),
+              ),
+        ),
+      ]
+    : [];
+
   const arvore = recortada
-    ? bloco([fundoDetalhes, camadaFoto, conteudoRecortado, cantoneiras])
-    : bloco([fundoDetalhes, topo, camadaFoto, ...infoInferior, cantoneiras]);
+    ? bloco([fundoDetalhes, camadaFoto, conteudoRecortado, ...distintivo, cantoneiras])
+    : bloco([fundoDetalhes, topo, camadaFoto, ...infoInferior, ...distintivo, cantoneiras]);
 
   return elementoParaPng(arvore, {
     width: L,

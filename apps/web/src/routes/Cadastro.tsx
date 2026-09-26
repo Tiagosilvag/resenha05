@@ -6,12 +6,7 @@ import { ApiError } from '../lib/api';
 import { enviarFoto } from '../lib/foto';
 import { Button, Field, Input, Aviso, Spinner, Avatar } from '../components/ui';
 import { Logo } from '../components/Logo';
-
-const TIMES = [
-  'Flamengo', 'Corinthians', 'Palmeiras', 'São Paulo', 'Vasco', 'Grêmio',
-  'Internacional', 'Cruzeiro', 'Atlético-MG', 'Santos', 'Botafogo', 'Fluminense',
-  'Bahia', 'Sport', 'Athletico-PR', 'Fortaleza', 'Ceará', 'Goiás',
-];
+import { SeletorTime } from '../components/SeletorTime';
 
 export function Cadastro() {
   const { cadastrar, recarregar } = useAuth();
@@ -148,12 +143,7 @@ export function Cadastro() {
             />
           </Field>
           <Field label="Time do coração (opcional)">
-            <Input list="times" value={timeCoracao} onChange={(e) => setTimeCoracao(e.target.value)} placeholder="Ex.: Flamengo" />
-            <datalist id="times">
-              {TIMES.map((t) => (
-                <option key={t} value={t} />
-              ))}
-            </datalist>
+            <SeletorTime value={timeCoracao} onChange={setTimeCoracao} />
           </Field>
 
           <Button type="submit" disabled={enviando} className="mt-1">
