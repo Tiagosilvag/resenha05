@@ -1,6 +1,8 @@
 import type { ColumnType, Generated } from 'kysely';
 
 type Timestamp = ColumnType<Date, Date | string, Date | string>;
+/** Timestamp com default no banco: opcional no insert, gravável no update. */
+type TimestampComDefault = ColumnType<Date, Date | string | undefined, Date | string>;
 
 export interface ProfilesTable {
   id: Generated<string>;
@@ -191,7 +193,7 @@ export interface PlataformaConfigTable {
   mp_geral_token_cipher: Buffer | null;
   mp_geral_token_nonce: Buffer | null;
   mp_geral_token_atualizado_em: Timestamp | null;
-  atualizado_em: Generated<Timestamp>;
+  atualizado_em: TimestampComDefault;
 }
 
 export interface AssinaturasTable {
@@ -203,7 +205,7 @@ export interface AssinaturasTable {
   valor_centavos: number;
   status: 'pendente' | 'aprovado' | 'atrasado' | 'cancelado';
   criado_em: Generated<Timestamp>;
-  atualizado_em: Generated<Timestamp>;
+  atualizado_em: TimestampComDefault;
 }
 
 export interface Database {
