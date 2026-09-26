@@ -12,6 +12,7 @@ import { db } from '../../db/index.js';
 import { env } from '../../env.js';
 import { validar } from '../../lib/validar.js';
 import { erro } from '../../lib/erros.js';
+import { exigirOrganizacaoLiberada } from '../../lib/assinatura.js';
 import { exigirAdmin, exigirDono, exigirMembro } from '../../plugins/auth.js';
 
 /** Descobre a organização de uma pelada e confirma que o usuário é membro. */
@@ -112,6 +113,14 @@ export const rotasPeladas: FastifyPluginAsync = async (app) => {
     r.post('/organizacoes/:id/configuracoes', async (req, reply) => {
       const { id } = req.params as { id: string };
       exigirAdmin(req, id);
+
+      const org = await db
+        .selectFrom('organizacoes')
+        .select('status_assinatura')
+        .where('id', '=', id)
+        .executeTakeFirstOrThrow();
+      exigirOrganizacaoLiberada(org.status_assinatura);
+
       const d = validar(criarConfiguracaoSchema, req.body);
       const c = await db
         .insertInto('pelada_configuracoes')

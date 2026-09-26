@@ -14,6 +14,7 @@ import { erro } from '../../lib/erros.js';
 import { exigirAdmin, exigirDono, exigirMembro } from '../../plugins/auth.js';
 import { cifrarToken, decifrarToken } from '../../lib/cripto.js';
 import { criarPreapproval } from '../../lib/mercadopago-preapproval.js';
+import { exigirOrganizacaoLiberada } from '../../lib/assinatura.js';
 import { primeiroDiaDoMesUtc } from '../../lib/periodo.js';
 import { env } from '../../env.js';
 
@@ -79,10 +80,11 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
     const { id } = req.params as { id: string };
     const existe = await db
       .selectFrom('organizacoes')
-      .select('id')
+      .select(['id', 'status_assinatura'])
       .where('id', '=', id)
       .executeTakeFirst();
     if (!existe) throw erro.naoEncontrado('Organização não encontrada.');
+    exigirOrganizacaoLiberada(existe.status_assinatura);
 
     await db
       .insertInto('organizacao_membros')
@@ -98,10 +100,11 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
     const { codigo } = validar(entrarPorCodigoSchema, req.body);
     const org = await db
       .selectFrom('organizacoes')
-      .select(['id', 'nome'])
+      .select(['id', 'nome', 'status_assinatura'])
       .where('codigo', '=', codigo)
       .executeTakeFirst();
     if (!org) throw erro.naoEncontrado('Nenhuma organização com esse código.');
+    exigirOrganizacaoLiberada(org.status_assinatura);
 
     await db
       .insertInto('organizacao_membros')
@@ -109,7 +112,7 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
       .onConflict((oc) => oc.columns(['organizacao_id', 'profile_id']).doNothing())
       .execute();
     reply.code(201);
-    return org;
+    return { id: org.id, nome: org.nome };
   });
 
   // Membro sai da organização por conta própria (o dono não pode sair — só encerrar).
@@ -187,6 +190,13 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
     const { id } = req.params as { id: string };
     exigirAdmin(req, id);
     const { profileId } = validar(adicionarMembroSchema, req.body);
+
+    const orgAdd = await db
+      .selectFrom('organizacoes')
+      .select('status_assinatura')
+      .where('id', '=', id)
+      .executeTakeFirstOrThrow();
+    exigirOrganizacaoLiberada(orgAdd.status_assinatura);
 
     const perfil = await db
       .selectFrom('profiles')

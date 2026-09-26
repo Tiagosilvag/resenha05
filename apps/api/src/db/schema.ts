@@ -1,4 +1,5 @@
 import type { ColumnType, Generated } from 'kysely';
+import type { StatusAssinatura } from '@resenha05/shared';
 
 type Timestamp = ColumnType<Date, Date | string, Date | string>;
 /** Timestamp com default no banco: opcional no insert, gravável no update. */
@@ -50,7 +51,7 @@ export interface OrganizacoesTable {
   mp_token_cipher: Buffer | null;
   mp_token_nonce: Buffer | null;
   mp_token_atualizado_em: Timestamp | null;
-  status_assinatura: Generated<string>;
+  status_assinatura: Generated<StatusAssinatura>;
   criado_em: Generated<Timestamp>;
 }
 

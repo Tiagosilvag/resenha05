@@ -3,6 +3,7 @@ import { cadastroSchema, loginSchema, refreshSchema } from '@resenha05/shared';
 import { db } from '../../db/index.js';
 import { validar } from '../../lib/validar.js';
 import { erro } from '../../lib/erros.js';
+import { exigirOrganizacaoLiberada } from '../../lib/assinatura.js';
 import { hashSenha, conferirSenha } from '../../lib/senha.js';
 import { carregarUsuario, emitirTokens, rotacionarRefresh, revogarSessoes } from '../../lib/sessao.js';
 
@@ -23,10 +24,11 @@ export const rotasAuth: FastifyPluginAsync = async (app) => {
     if (dados.codigoOrganizacao) {
       const org = await db
         .selectFrom('organizacoes')
-        .select('id')
+        .select(['id', 'status_assinatura'])
         .where('codigo', '=', dados.codigoOrganizacao)
         .executeTakeFirst();
       if (!org) throw erro.invalido('Nenhuma organização com esse código.');
+      exigirOrganizacaoLiberada(org.status_assinatura);
       organizacaoId = org.id;
     }
 
