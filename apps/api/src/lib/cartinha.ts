@@ -26,7 +26,12 @@ function comAlfa(hex: string, alfa: number): string {
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alfa})`;
 }
 
-async function fotoDataUri(fotoUrl: string | null): Promise<string | null> {
+/**
+ * Devolve a foto como data URI e, quando é PNG (sempre o caso da foto
+ * recortada pelo bgremove), as dimensões reais — usadas pra calcular a
+ * altura de encaixe na carta sem esticar/cortar a proporção da foto.
+ */
+async function fotoDataUri(fotoUrl: string | null): Promise<{ uri: string; w: number; h: number } | null> {
   if (!fotoUrl) return null;
   const rel = fotoUrl.replace(/^\/api\/uploads\//, '');
   if (rel.includes('..')) return null;
@@ -34,7 +39,12 @@ async function fotoDataUri(fotoUrl: string | null): Promise<string | null> {
     const buf = await readFile(join(UPLOADS_DIR, rel));
     const ext = rel.split('.').pop()?.toLowerCase();
     const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
-    return `data:${mime};base64,${buf.toString('base64')}`;
+    const uri = `data:${mime};base64,${buf.toString('base64')}`;
+    // PNG: largura e altura ficam nos bytes 16–23 do cabeçalho (IHDR)
+    if (mime === 'image/png' && buf.length > 24) {
+      return { uri, w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
+    }
+    return { uri, w: 0, h: 0 };
   } catch {
     return null;
   }
@@ -72,6 +82,13 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
   const foto = await fotoDataUri(dados.fotoUrl);
   const logo = await logoDataUri();
   const recortada = Boolean(dados.fotoRecortada && foto);
+  // Caixa disponível pra foto recortada: largura L-12 x altura A-12, com uma
+  // pequena margem de cada lado. A altura usada é a que cabe nos dois
+  // limites (largura e altura) mantendo a proporção real da foto.
+  const alturaFoto =
+    recortada && foto!.w > 0 && foto!.h > 0
+      ? Math.min(920, ((L - 12 - 40) * foto!.h) / foto!.w)
+      : 780;
   const nome = (dados.nome ?? 'Jogador').toUpperCase();
   const pos = selo(dados.posicao as Posicao | null);
   const pe = seloPe(dados.pePreferido);
@@ -90,17 +107,17 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
       h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 800, fontSize: 46, color: CRE, lineHeight: 1 } }, String(at[a])),
     );
 
-  // Versão compacta do atributo — label + valor lado a lado, pra empilhar na
+  // Versão compacta do atributo — sigla em cima, número embaixo, empilhado na
   // coluna lateral (carta recortada). Sombra forte porque fica sobre a foto.
   const statLateral = (a: (typeof ATRIBUTOS_CARTA)[number]): El =>
     h(
       'div',
-      { style: { display: 'flex', alignItems: 'baseline', gap: 8 } },
+      { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 } },
       h(
         'span',
         {
           style: {
-            fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 17, width: 34,
+            fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 15,
             color: brilho, letterSpacing: 1, textShadow: '0 2px 6px rgba(0,0,0,0.9)',
           },
         },
@@ -110,7 +127,7 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
         'span',
         {
           style: {
-            fontFamily: 'Barlow Condensed', fontWeight: 800, fontSize: 27, lineHeight: 1,
+            fontFamily: 'Barlow Condensed', fontWeight: 800, fontSize: 30, lineHeight: 1,
             color: CRE, textShadow: '0 2px 6px rgba(0,0,0,0.9)',
           },
         },
@@ -220,7 +237,11 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
             borderRadius: 34,
           },
         },
-        h('img', { src: foto!, style: { height: 780, objectFit: 'contain' } }),
+        // Altura calculada pra caber tanto na largura quanto na altura
+        // disponíveis mantendo a proporção real da foto — antes, height:780
+        // fixo sempre deixava um vão em cima e empurrava o rosto pra baixo,
+        // sob a faixa mais escura do scrim.
+        h('img', { src: foto!.uri, style: { height: alturaFoto, objectFit: 'contain' } }),
         // scrim de topo — mantém OVR/posição/brasão legíveis sobre qualquer foto
         h('div', {
           style: {
@@ -271,7 +292,7 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
         ...(foto
           ? [
               h('img', {
-                src: foto,
+                src: foto.uri,
                 style: { position: 'absolute', top: 0, left: 0, width: 500, height: 400, objectFit: 'cover' },
               }),
               h('div', {
@@ -416,23 +437,22 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
   // Não-recortada: escudo solto no canto, como antes.
   const distintivo: El[] = timeReconhecido ? [h('div', { style: { display: 'flex', position: 'absolute', left: 54, top: 226 } }, elementoEscudo(52, 62)!)] : [];
 
-  // Recortada: escudo + os 4 atributos empilhados numa coluna à esquerda, sob
+  // Recortada: os 4 atributos empilhados numa coluna à esquerda, sob
   // OVR/posição — deixa o centro/base da carta livre pra foto e pro nome não
-  // brigarem com números por cima do rosto.
+  // brigarem com números por cima do rosto. O escudo do time vai pro rodapé.
   const colunaLateral: El = h(
     'div',
     {
       style: {
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'flex-start',
-        gap: 9,
+        alignItems: 'center',
+        gap: 14,
         position: 'absolute',
         left: 54,
         top: 226,
       },
     },
-    ...(timeReconhecido ? [elementoEscudo(50, 60)!, h('div', { style: { display: 'flex', height: 6 } })] : []),
     ...ATRIBUTOS_CARTA.map(statLateral),
     h(
       'div',
@@ -453,8 +473,9 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
     ),
   );
 
-  // Recortada: embaixo só nome + "time · resenha05" — os atributos foram
-  // pra coluna lateral, então essa faixa fica curta e fácil de escurecer.
+  // Recortada: embaixo nome + "time · resenha05" e, por último, o brasão do
+  // time — os atributos foram pra coluna lateral, então essa faixa fica
+  // curta e fácil de escurecer.
   const rodapeRecortado: El = h(
     'div',
     { style: { display: 'flex', flexDirection: 'column', alignItems: 'center' } },
@@ -462,6 +483,7 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
     h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 800, fontSize: 54, color: brilho, textAlign: 'center', lineHeight: 1 } }, nome),
     h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 20, color: DIM, letterSpacing: 3, marginTop: 6 } },
       timeReconhecido ? `${tema.nome.toUpperCase()} · RESENHA 05` : 'RESENHA 05'),
+    ...(timeReconhecido ? [h('div', { style: { display: 'flex', marginTop: 14 } }, elementoEscudo(54, 64)!)] : []),
   );
 
   const conteudoRecortado = h(
