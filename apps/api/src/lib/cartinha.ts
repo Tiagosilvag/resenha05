@@ -90,6 +90,34 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
       h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 800, fontSize: 46, color: CRE, lineHeight: 1 } }, String(at[a])),
     );
 
+  // Versão compacta do atributo — label + valor lado a lado, pra empilhar na
+  // coluna lateral (carta recortada). Sombra forte porque fica sobre a foto.
+  const statLateral = (a: (typeof ATRIBUTOS_CARTA)[number]): El =>
+    h(
+      'div',
+      { style: { display: 'flex', alignItems: 'baseline', gap: 8 } },
+      h(
+        'span',
+        {
+          style: {
+            fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 17, width: 34,
+            color: brilho, letterSpacing: 1, textShadow: '0 2px 6px rgba(0,0,0,0.9)',
+          },
+        },
+        ROTULO_ATRIBUTO[a],
+      ),
+      h(
+        'span',
+        {
+          style: {
+            fontFamily: 'Barlow Condensed', fontWeight: 800, fontSize: 27, lineHeight: 1,
+            color: CRE, textShadow: '0 2px 6px rgba(0,0,0,0.9)',
+          },
+        },
+        String(at[a]),
+      ),
+    );
+
   const camadaAbsoluta = (...filhos: El[]): El =>
     h(
       'div',
@@ -192,7 +220,7 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
             borderRadius: 34,
           },
         },
-        h('img', { src: foto!, style: { height: 858, objectFit: 'contain' } }),
+        h('img', { src: foto!, style: { height: 780, objectFit: 'contain' } }),
         // scrim de topo — mantém OVR/posição/brasão legíveis sobre qualquer foto
         h('div', {
           style: {
@@ -206,7 +234,10 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
               'linear-gradient(to bottom, rgba(10,10,11,0.72) 0%, rgba(10,10,11,0.28) 50%, rgba(10,10,11,0) 100%)',
           },
         }),
-        // scrim inferior — os pés do jogador dissolvem na placa de nome
+        // scrim inferior — o peito/pescoço do jogador dissolve na placa de
+        // nome/atributos. Precisa escurecer BEM antes de chegar lá, porque o
+        // texto é empurrado pro fundo da carta (ver conteudoRecortado) e uma
+        // foto de rosto comum já cobre essa faixa toda.
         h('div', {
           style: {
             display: 'flex',
@@ -214,9 +245,9 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
             bottom: 0,
             left: 0,
             width: L - 12,
-            height: 500,
+            height: 660,
             backgroundImage:
-              'linear-gradient(to top, #0b0b0c 0%, rgba(11,11,12,0.97) 24%, rgba(11,11,12,0.72) 48%, rgba(11,11,12,0.3) 74%, rgba(11,11,12,0) 100%)',
+              'linear-gradient(to top, #0b0b0c 0%, rgba(11,11,12,0.98) 16%, rgba(11,11,12,0.92) 32%, rgba(11,11,12,0.78) 48%, rgba(11,11,12,0.5) 64%, rgba(11,11,12,0.18) 82%, rgba(11,11,12,0) 100%)',
           },
         }),
       )
@@ -329,6 +360,110 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
     rodape,
   ];
 
+  // Escudo do time — usa o PNG oficial se existir em assets/escudos/<id>.png;
+  // senão desenha um genérico nas cores do time com a sigla.
+  const escudoOficial = timeReconhecido ? await escudoDataUri(tema.id) : null;
+  const elementoEscudo = (larg: number, alt: number): El | null => {
+    if (!timeReconhecido) return null;
+    if (escudoOficial) {
+      const f = Math.min(larg / escudoOficial.w, alt / escudoOficial.h);
+      return h('img', {
+        src: escudoOficial.uri,
+        style: { width: Math.round(escudoOficial.w * f), height: Math.round(escudoOficial.h * f) },
+      });
+    }
+    return h(
+      'div',
+      {
+        style: {
+          display: 'flex',
+          flexDirection: 'column',
+          width: larg,
+          height: alt,
+          borderRadius: '7px 7px 28px 28px',
+          border: `3px solid ${brilho}`,
+          overflow: 'hidden',
+          backgroundColor: tema.primaria,
+        },
+      },
+      h(
+        'div',
+        { style: { display: 'flex', flexGrow: 1, alignItems: 'center', justifyContent: 'center' } },
+        h(
+          'span',
+          {
+            style: {
+              fontFamily: 'Barlow Condensed',
+              fontWeight: 800,
+              fontSize: 22,
+              letterSpacing: 1,
+              color: luminancia(tema.primaria) > 0.3 ? '#141414' : '#FFFFFF',
+            },
+          },
+          siglaTime(tema),
+        ),
+      ),
+      h(
+        'div',
+        { style: { display: 'flex', height: 16 } },
+        ...[tema.secundaria, tema.terciaria]
+          .filter((c): c is string => Boolean(c))
+          .map((c, i) => h('div', { key: i, style: { display: 'flex', flexGrow: 1, backgroundColor: c } })),
+      ),
+    );
+  };
+
+  // Não-recortada: escudo solto no canto, como antes.
+  const distintivo: El[] = timeReconhecido ? [h('div', { style: { display: 'flex', position: 'absolute', left: 54, top: 226 } }, elementoEscudo(52, 62)!)] : [];
+
+  // Recortada: escudo + os 4 atributos empilhados numa coluna à esquerda, sob
+  // OVR/posição — deixa o centro/base da carta livre pra foto e pro nome não
+  // brigarem com números por cima do rosto.
+  const colunaLateral: El = h(
+    'div',
+    {
+      style: {
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        gap: 9,
+        position: 'absolute',
+        left: 54,
+        top: 226,
+      },
+    },
+    ...(timeReconhecido ? [elementoEscudo(50, 60)!, h('div', { style: { display: 'flex', height: 6 } })] : []),
+    ...ATRIBUTOS_CARTA.map(statLateral),
+    h(
+      'div',
+      { style: { display: 'flex', gap: 6, marginTop: 6 } },
+      ...Array.from({ length: 5 }, (_, i) =>
+        h('div', {
+          key: i,
+          style: {
+            display: 'flex',
+            width: 11,
+            height: 11,
+            transform: 'rotate(45deg)',
+            backgroundColor: i < estrelas ? brilho : 'transparent',
+            border: `1.5px solid ${i < estrelas ? brilho : comAlfa(brilho, 0.35)}`,
+          },
+        }),
+      ),
+    ),
+  );
+
+  // Recortada: embaixo só nome + "time · resenha05" — os atributos foram
+  // pra coluna lateral, então essa faixa fica curta e fácil de escurecer.
+  const rodapeRecortado: El = h(
+    'div',
+    { style: { display: 'flex', flexDirection: 'column', alignItems: 'center' } },
+    h('div', { style: { display: 'flex', width: 120, height: 3, backgroundColor: contorno, marginBottom: 12 } }),
+    h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 800, fontSize: 54, color: brilho, textAlign: 'center', lineHeight: 1 } }, nome),
+    h('span', { style: { fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 20, color: DIM, letterSpacing: 3, marginTop: 6 } },
+      timeReconhecido ? `${tema.nome.toUpperCase()} · RESENHA 05` : 'RESENHA 05'),
+  );
+
   const conteudoRecortado = h(
     'div',
     {
@@ -342,72 +477,13 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
       },
     },
     topo,
+    colunaLateral,
     h('div', { style: { display: 'flex', flexGrow: 1 } }),
-    ...infoInferior,
+    rodapeRecortado,
   );
 
-  // Escudo do time abaixo de OVR/posição, à esquerda (como nas cartas FUT).
-  // Usa o PNG oficial se existir em assets/escudos/<id>.png; senão desenha um
-  // escudo nas cores do time com a sigla.
-  const escudoOficial = timeReconhecido ? await escudoDataUri(tema.id) : null;
-  const distintivo: El[] = timeReconhecido
-    ? [
-        h(
-          'div',
-          { style: { display: 'flex', position: 'absolute', left: 54, top: 226 } },
-          escudoOficial
-            ? h('img', {
-                src: escudoOficial.uri,
-                style: {
-                  width: Math.round(escudoOficial.w * Math.min(52 / escudoOficial.w, 62 / escudoOficial.h)),
-                  height: Math.round(escudoOficial.h * Math.min(52 / escudoOficial.w, 62 / escudoOficial.h)),
-                },
-              })
-            : h(
-                'div',
-                {
-                  style: {
-                    display: 'flex',
-                    flexDirection: 'column',
-                    width: 52,
-                    height: 62,
-                    borderRadius: '7px 7px 28px 28px',
-                    border: `3px solid ${brilho}`,
-                    overflow: 'hidden',
-                    backgroundColor: tema.primaria,
-                  },
-                },
-                h(
-                  'div',
-                  { style: { display: 'flex', flexGrow: 1, alignItems: 'center', justifyContent: 'center' } },
-                  h(
-                    'span',
-                    {
-                      style: {
-                        fontFamily: 'Barlow Condensed',
-                        fontWeight: 800,
-                        fontSize: 22,
-                        letterSpacing: 1,
-                        color: luminancia(tema.primaria) > 0.3 ? '#141414' : '#FFFFFF',
-                      },
-                    },
-                    siglaTime(tema),
-                  ),
-                ),
-                h(
-                  'div',
-                  { style: { display: 'flex', height: 16 } },
-                  ...[tema.secundaria, tema.terciaria]
-                    .filter((c): c is string => Boolean(c))
-                    .map((c, i) => h('div', { key: i, style: { display: 'flex', flexGrow: 1, backgroundColor: c } })),
-                ),
-              ),
-        ),
-      ]
-    : [];
-
   const arvore = recortada
-    ? bloco([fundoDetalhes, camadaFoto, conteudoRecortado, ...distintivo, cantoneiras])
+    ? bloco([fundoDetalhes, camadaFoto, conteudoRecortado, cantoneiras])
     : bloco([fundoDetalhes, topo, camadaFoto, ...infoInferior, ...distintivo, cantoneiras]);
 
   return elementoParaPng(arvore, {
