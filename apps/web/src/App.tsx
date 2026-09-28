@@ -18,6 +18,7 @@ import { Artilharia } from './routes/Artilharia';
 import { NovaOrganizacao } from './routes/NovaOrganizacao';
 import { EntrarOrg } from './routes/EntrarOrg';
 import { Assinatura } from './routes/Assinatura';
+import { OrganizacaoMercadoPago } from './routes/OrganizacaoMercadoPago';
 import { Admin } from './routes/Admin';
 
 function Protegida({ children }: { children: ReactNode }) {
@@ -53,6 +54,7 @@ export function App() {
       <Route path="/nova-organizacao" element={<Protegida><NovaOrganizacao /></Protegida>} />
       <Route path="/org/:orgId/admins" element={<Protegida><Administradores /></Protegida>} />
       <Route path="/org/:orgId/assinatura" element={<Protegida><Assinatura /></Protegida>} />
+      <Route path="/org/:orgId/mercadopago" element={<Protegida><OrganizacaoMercadoPago /></Protegida>} />
       <Route path="/entrar-org/:orgId" element={<Protegida><EntrarOrg /></Protegida>} />
       <Route path="/admin" element={<Protegida><Admin /></Protegida>} />
 

@@ -334,6 +334,17 @@ export function Administradores() {
       )}
 
       {souDono && (
+        <Link to={`/org/${orgId}/mercadopago`}>
+          <Card className="flex items-center justify-between gap-3 transition-shadow hover:shadow-pop">
+            <p className="font-display font-semibold uppercase tracking-[0.02em]">Conta Mercado Pago</p>
+            <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0 stroke-tinta-faint" fill="none" strokeWidth="2" strokeLinecap="round">
+              <path d="m9 6 6 6-6 6" />
+            </svg>
+          </Card>
+        </Link>
+      )}
+
+      {souDono && (
         <Card>
           <button
             className="w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-barro-600 hover:bg-barro-100/50"
