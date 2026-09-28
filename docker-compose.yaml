@@ -33,7 +33,6 @@ services:
       RESENHA05_ENC_KEY: ${RESENHA05_ENC_KEY}
       # Obrigatória: sem ela a API não sobe (env.ts). Ver .env.example.
       PLATAFORMA_DEV_TELEFONE: ${PLATAFORMA_DEV_TELEFONE:?defina PLATAFORMA_DEV_TELEFONE (telefone do dev da plataforma)}
-      MERCADOPAGO_WEBHOOK_SECRET: ${MERCADOPAGO_WEBHOOK_SECRET:-}
       WEB_ORIGIN: ${WEB_ORIGIN:-https://resenha05.coffetech.com.br}
       UPLOADS_DIR: /data/uploads
       # Recorte de fundo da foto (card estilo FIFA) — container interno abaixo.

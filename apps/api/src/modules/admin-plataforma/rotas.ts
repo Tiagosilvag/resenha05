@@ -3,6 +3,7 @@ import {
   cadastrarAdminPlataformaSchema,
   configurarMensalidadeSchema,
   conectarMercadoPagoGeralSchema,
+  configurarWebhookSecretSchema,
 } from '@resenha05/shared';
 import { db } from '../../db/index.js';
 import { exigirAdminPlataforma, exigirDev } from '../../plugins/auth.js';
@@ -54,13 +55,19 @@ export const rotasAdminPlataforma: FastifyPluginAsync = async (app) => {
   app.get('/admin/configuracoes', async () => {
     const cfg = await db
       .selectFrom('plataforma_config')
-      .select(['mensalidade_valor_centavos as mensalidadeValorCentavos', 'mp_geral_token_atualizado_em as mpGeralAtualizadoEm'])
+      .select([
+        'mensalidade_valor_centavos as mensalidadeValorCentavos',
+        'mp_geral_token_atualizado_em as mpGeralAtualizadoEm',
+        'mp_geral_webhook_secret_atualizado_em as webhookAtualizadoEm',
+      ])
       .where('id', '=', 1)
       .executeTakeFirstOrThrow();
     return {
       mensalidadeValorCentavos: cfg.mensalidadeValorCentavos,
       mercadoPagoConectado: cfg.mpGeralAtualizadoEm != null,
       mpGeralAtualizadoEm: cfg.mpGeralAtualizadoEm,
+      webhookConfigurado: cfg.webhookAtualizadoEm != null,
+      webhookAtualizadoEm: cfg.webhookAtualizadoEm,
     };
   });
 
@@ -89,6 +96,28 @@ export const rotasAdminPlataforma: FastifyPluginAsync = async (app) => {
         mp_geral_token_cipher: cipher,
         mp_geral_token_nonce: nonce,
         mp_geral_token_atualizado_em: new Date(),
+        atualizado_em: new Date(),
+      })
+      .where('id', '=', 1)
+      .execute();
+    return { ok: true };
+  });
+
+  app.post('/admin/mercadopago/webhook-secret', async (req) => {
+    const { webhookSecret } = validar(configurarWebhookSecretSchema, req.body);
+    let cipher: Buffer;
+    let nonce: Buffer;
+    try {
+      ({ cipher, nonce } = cifrarToken(webhookSecret));
+    } catch {
+      throw erro.invalido('Servidor sem chave de criptografia configurada (RESENHA05_ENC_KEY).');
+    }
+    await db
+      .updateTable('plataforma_config')
+      .set({
+        mp_geral_webhook_secret_cipher: cipher,
+        mp_geral_webhook_secret_nonce: nonce,
+        mp_geral_webhook_secret_atualizado_em: new Date(),
         atualizado_em: new Date(),
       })
       .where('id', '=', 1)

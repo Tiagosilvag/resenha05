@@ -18,3 +18,7 @@ export const conectarMercadoPagoGeralSchema = z.object({
 export const cadastrarAdminPlataformaSchema = z.object({
   profileId: z.string().uuid(),
 });
+
+export const configurarWebhookSecretSchema = z.object({
+  webhookSecret: z.string().trim().min(10, 'Segredo muito curto.').max(200),
+});

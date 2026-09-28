@@ -8,6 +8,8 @@ interface Configuracoes {
   mensalidadeValorCentavos: number;
   mercadoPagoConectado: boolean;
   mpGeralAtualizadoEm: string | null;
+  webhookConfigurado: boolean;
+  webhookAtualizadoEm: string | null;
 }
 
 export function AdminConfiguracoes() {
@@ -49,6 +51,21 @@ export function AdminConfiguracoes() {
       setTimeout(() => setOkToken(false), 2500);
     },
     onError: (e) => setErroToken(e instanceof ApiError ? e.message : 'Não foi possível conectar.'),
+  });
+
+  const [webhookSecret, setWebhookSecret] = useState('');
+  const [erroWebhook, setErroWebhook] = useState<string | null>(null);
+  const [okWebhook, setOkWebhook] = useState(false);
+
+  const salvarWebhook = useMutation({
+    mutationFn: () => api('/admin/mercadopago/webhook-secret', { method: 'POST', json: { webhookSecret } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-configuracoes'] });
+      setWebhookSecret('');
+      setOkWebhook(true);
+      setTimeout(() => setOkWebhook(false), 2500);
+    },
+    onError: (e) => setErroWebhook(e instanceof ApiError ? e.message : 'Não foi possível salvar.'),
   });
 
   if (isLoading) return <Spinner className="h-5 w-5 text-campo-600" />;
@@ -116,6 +133,45 @@ export function AdminConfiguracoes() {
             disabled={salvarToken.isPending || accessToken.trim().length < 20}
           >
             {salvarToken.isPending ? <Spinner /> : 'Salvar'}
+          </Button>
+        </form>
+      </Card>
+
+      <Card>
+        <p className="eyebrow mb-1">Segredo do webhook</p>
+        <p className="mb-3 text-sm text-tinta-soft">
+          {data?.webhookConfigurado
+            ? `Configurado${
+                data.webhookAtualizadoEm
+                  ? ` desde ${new Date(data.webhookAtualizadoEm).toLocaleDateString('pt-BR')}`
+                  : ''
+              }.`
+            : 'Ainda não configurado — sem ele, o webhook de assinatura recusa tudo.'}{' '}
+          Cadastre a URL do webhook no painel do Mercado Pago e cole aqui o segredo que ele gerar.
+        </p>
+        {erroWebhook && <Aviso tipo="erro">{erroWebhook}</Aviso>}
+        {okWebhook && <Aviso tipo="ok">Segredo salvo.</Aviso>}
+        <form
+          className="mt-2 flex items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setErroWebhook(null);
+            salvarWebhook.mutate();
+          }}
+        >
+          <Input
+            type="password"
+            autoComplete="off"
+            placeholder="Segredo do webhook"
+            value={webhookSecret}
+            onChange={(e) => setWebhookSecret(e.target.value)}
+          />
+          <Button
+            type="submit"
+            variante="secundario"
+            disabled={salvarWebhook.isPending || webhookSecret.trim().length < 10}
+          >
+            {salvarWebhook.isPending ? <Spinner /> : 'Salvar'}
           </Button>
         </form>
       </Card>

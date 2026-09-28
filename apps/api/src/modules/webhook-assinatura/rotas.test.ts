@@ -8,32 +8,12 @@ async function montar() {
   return app;
 }
 
-const evento = { type: 'subscription_preapproval', data: { id: 'pre_falso' } };
-
 describe('POST /webhooks/mercadopago/assinatura', () => {
-  it('recusa com 401 quando a assinatura não bate', async () => {
-    const app = await montar();
-    const r = await app.inject({
-      method: 'POST',
-      url: '/webhooks/mercadopago/assinatura',
-      headers: { 'x-signature': 'ts=1700000000,v1=' + 'a'.repeat(64), 'x-request-id': 'req-1' },
-      payload: evento,
-    });
-    expect(r.statusCode).toBe(401);
-    expect(r.json()).toEqual({ erro: 'Assinatura inválida.' });
-  });
-
-  it('recusa com 401 quando o header x-signature está ausente', async () => {
-    const app = await montar();
-    const r = await app.inject({
-      method: 'POST',
-      url: '/webhooks/mercadopago/assinatura',
-      payload: evento,
-    });
-    expect(r.statusCode).toBe(401);
-  });
-
   it('confirma com 200, sem processar, eventos que não são de preapproval', async () => {
+    // Este caminho retorna antes de qualquer consulta ao banco — os demais
+    // (autenticação e processamento) dependem de plataforma_config e são
+    // cobertos em autenticar.test.ts e processar.test.ts, que testam a
+    // lógica com dependências injetadas em vez de um Postgres de verdade.
     const app = await montar();
     const r = await app.inject({
       method: 'POST',

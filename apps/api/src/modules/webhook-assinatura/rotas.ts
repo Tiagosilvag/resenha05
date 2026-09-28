@@ -1,11 +1,10 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { derivarStatusOrganizacao } from '@resenha05/shared';
 import { db } from '../../db/index.js';
-import { env } from '../../env.js';
-import { verificarAssinaturaWebhook } from '../../lib/mercadopago-webhook.js';
 import { buscarPreapproval } from '../../lib/mercadopago-preapproval.js';
 import { decifrarToken } from '../../lib/cripto.js';
 import { processarPreapproval } from './processar.js';
+import { autenticarWebhook } from './autenticar.js';
 
 export const rotasWebhookAssinatura: FastifyPluginAsync = async (app) => {
   app.post('/webhooks/mercadopago/assinatura', async (req, reply) => {
@@ -20,30 +19,38 @@ export const rotasWebhookAssinatura: FastifyPluginAsync = async (app) => {
       return { ok: true };
     }
 
-    if (!env.MERCADOPAGO_WEBHOOK_SECRET) {
-      req.log.error('MERCADOPAGO_WEBHOOK_SECRET não configurado — recusando webhook.');
-      reply.code(500);
-      return { erro: 'Webhook não configurado.' };
-    }
+    const cfg = await db
+      .selectFrom('plataforma_config')
+      .select([
+        'mp_geral_webhook_secret_cipher',
+        'mp_geral_webhook_secret_nonce',
+        'mp_geral_token_cipher',
+        'mp_geral_token_nonce',
+      ])
+      .where('id', '=', 1)
+      .executeTakeFirstOrThrow();
 
     const xSignature = (req.headers['x-signature'] as string) ?? '';
     const xRequestId = (req.headers['x-request-id'] as string) ?? '';
-    const valido = verificarAssinaturaWebhook({
-      secret: env.MERCADOPAGO_WEBHOOK_SECRET,
-      dataId,
-      xRequestId,
-      xSignature,
-    });
-    if (!valido) {
+    const autenticacao = await autenticarWebhook(
+      { dataId, xRequestId, xSignature },
+      {
+        buscarSegredo: async () => {
+          if (!cfg.mp_geral_webhook_secret_cipher || !cfg.mp_geral_webhook_secret_nonce) return null;
+          return decifrarToken(cfg.mp_geral_webhook_secret_cipher, cfg.mp_geral_webhook_secret_nonce);
+        },
+      },
+    );
+    if (autenticacao === 'nao_configurado') {
+      req.log.error('Segredo do webhook do Mercado Pago não configurado (via /admin) — recusando webhook.');
+      reply.code(500);
+      return { erro: 'Webhook não configurado.' };
+    }
+    if (autenticacao === 'invalido') {
       reply.code(401);
       return { erro: 'Assinatura inválida.' };
     }
 
-    const cfg = await db
-      .selectFrom('plataforma_config')
-      .select(['mp_geral_token_cipher', 'mp_geral_token_nonce'])
-      .where('id', '=', 1)
-      .executeTakeFirstOrThrow();
     if (!cfg.mp_geral_token_cipher || !cfg.mp_geral_token_nonce) {
       req.log.error('Webhook recebido sem conta MP geral configurada.');
       reply.code(200); // confirma recebimento; não há o que processar

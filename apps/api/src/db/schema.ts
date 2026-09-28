@@ -194,6 +194,9 @@ export interface PlataformaConfigTable {
   mp_geral_token_cipher: Buffer | null;
   mp_geral_token_nonce: Buffer | null;
   mp_geral_token_atualizado_em: Timestamp | null;
+  mp_geral_webhook_secret_cipher: Buffer | null;
+  mp_geral_webhook_secret_nonce: Buffer | null;
+  mp_geral_webhook_secret_atualizado_em: Timestamp | null;
   atualizado_em: TimestampComDefault;
 }
 
