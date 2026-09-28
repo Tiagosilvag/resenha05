@@ -36,6 +36,33 @@ export const rotasAdminPlataforma: FastifyPluginAsync = async (app) => {
     return query.execute();
   });
 
+  // Exclusão de conta por um dev (LGPD/moderação) — mesmas travas da
+  // autoexclusão em /perfil: quem é dono de organização não pode ser
+  // excluído sem antes transferir ou encerrar a organização.
+  app.delete('/admin/participantes/:profileId', async (req, reply) => {
+    exigirDev(req);
+    const { profileId } = req.params as { profileId: string };
+
+    if (profileId === req.usuario.id) {
+      throw erro.invalido('Use "Excluir conta" no seu Perfil para excluir a própria conta.');
+    }
+
+    const donoDe = await db
+      .selectFrom('organizacoes')
+      .select('id')
+      .where('dono_id', '=', profileId)
+      .executeTakeFirst();
+    if (donoDe) {
+      throw erro.conflito(
+        'Esta pessoa é dona de uma organização — transfira ou encerre a organização antes de excluir a conta.',
+      );
+    }
+
+    const r = await db.deleteFrom('profiles').where('id', '=', profileId).executeTakeFirst();
+    if (r.numDeletedRows === 0n) throw erro.naoEncontrado('Perfil não encontrado.');
+    reply.code(204);
+  });
+
   app.get('/admin/organizacoes', async (req) => {
     const q = ((req.query as { q?: string }).q ?? '').trim();
 
