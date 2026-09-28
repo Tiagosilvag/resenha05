@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MAX_ADMINS, formatarTelefone } from '@resenha05/shared';
 import { useAuth } from '../lib/auth';
@@ -320,6 +320,17 @@ export function Administradores() {
             Sair da organização
           </button>
         </Card>
+      )}
+
+      {souDono && (
+        <Link to={`/org/${orgId}/assinatura`}>
+          <Card className="flex items-center justify-between gap-3 transition-shadow hover:shadow-pop">
+            <p className="font-display font-semibold uppercase tracking-[0.02em]">Assinatura da organização</p>
+            <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0 stroke-tinta-faint" fill="none" strokeWidth="2" strokeLinecap="round">
+              <path d="m9 6 6 6-6 6" />
+            </svg>
+          </Card>
+        </Link>
       )}
 
       {souDono && (

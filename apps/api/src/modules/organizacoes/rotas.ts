@@ -350,7 +350,7 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
         externalReference: `${org.id}:${periodoStr}`,
         payerEmail: req.usuario.telefone.replace(/\D/g, '') + '@resenha05.invalid',
         valorCentavos: cfg.mensalidade_valor_centavos,
-        backUrl: `${env.WEB_ORIGIN}/organizacoes/${org.id}`,
+        backUrl: `${env.WEB_ORIGIN}/org/${org.id}/assinatura`,
       });
     } catch (e) {
       req.log.error({ err: e }, 'Falha ao criar a assinatura no Mercado Pago');

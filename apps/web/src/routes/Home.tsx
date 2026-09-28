@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../lib/auth';
 import { api, ApiError } from '../lib/api';
-import { Aviso, Button, Card, Estrelas, Eyebrow, Input, Spinner } from '../components/ui';
+import { Aviso, Button, Card, Chip, Estrelas, Eyebrow, Input, Spinner } from '../components/ui';
 
 interface ExtraResp {
   progresso: number;
@@ -95,25 +95,32 @@ export function Home() {
         {usuario?.organizacoes.length ? (
           <div className="flex flex-col gap-2">
             {usuario.organizacoes.map((o) => (
-              <Card key={o.id} className="flex items-center gap-3 py-3">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-campo-100 font-display text-base font-bold text-campo-700">
-                  {o.nome.slice(0, 2).toUpperCase()}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold">{o.nome}</p>
-                  <p className="font-display text-[0.7rem] font-semibold uppercase tracking-[0.05em] text-tinta-faint">
-                    {o.papel.replace('_', ' ')}
-                  </p>
+              <Card key={o.id} className="flex flex-col gap-2 py-3">
+                <div className="flex items-center gap-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-campo-100 font-display text-base font-bold text-campo-700">
+                    {o.nome.slice(0, 2).toUpperCase()}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold">{o.nome}</p>
+                    <p className="font-display text-[0.7rem] font-semibold uppercase tracking-[0.05em] text-tinta-faint">
+                      {o.papel.replace('_', ' ')}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <Estrelas n={o.estrelas} />
+                    <Link
+                      to={`/org/${o.id}/admins`}
+                      className="font-display text-[0.7rem] font-semibold uppercase tracking-[0.04em] text-campo-700"
+                    >
+                      {o.papel === 'jogador' ? 'Ver' : 'Gerir'}
+                    </Link>
+                  </div>
                 </div>
-                <div className="flex shrink-0 flex-col items-end gap-1">
-                  <Estrelas n={o.estrelas} />
-                  <Link
-                    to={`/org/${o.id}/admins`}
-                    className="font-display text-[0.7rem] font-semibold uppercase tracking-[0.04em] text-campo-700"
-                  >
-                    {o.papel === 'jogador' ? 'Ver' : 'Gerir'}
+                {o.statusAssinatura !== 'ativa' && (
+                  <Link to={`/org/${o.id}/assinatura`}>
+                    <Chip tom="pendente">Mensalidade pendente</Chip>
                   </Link>
-                </div>
+                )}
               </Card>
             ))}
           </div>

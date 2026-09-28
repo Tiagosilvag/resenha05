@@ -11,6 +11,8 @@ export * from './classificacao.js';
 export * from './cartinha.js';
 export * from './assinatura.js';
 
+import type { StatusAssinatura } from './schemas/admin-plataforma.js';
+
 /** Formato do usuário logado devolvido pela API em /auth/* e /perfil. */
 export interface SessaoUsuario {
   id: string;
@@ -31,4 +33,5 @@ export interface OrganizacaoDoUsuario {
   codigo: string;
   papel: 'jogador' | 'admin' | 'admin_principal';
   estrelas: number;
+  statusAssinatura: StatusAssinatura;
 }

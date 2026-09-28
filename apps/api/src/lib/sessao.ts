@@ -27,7 +27,14 @@ export async function carregarUsuario(profileId: string): Promise<SessaoUsuario>
   const orgs = await db
     .selectFrom('organizacao_membros as m')
     .innerJoin('organizacoes as o', 'o.id', 'm.organizacao_id')
-    .select(['o.id as id', 'o.nome as nome', 'o.codigo as codigo', 'm.papel as papel', 'm.estrelas as estrelas'])
+    .select([
+      'o.id as id',
+      'o.nome as nome',
+      'o.codigo as codigo',
+      'm.papel as papel',
+      'm.estrelas as estrelas',
+      'o.status_assinatura as statusAssinatura',
+    ])
     .where('m.profile_id', '=', profileId)
     .where('m.ativo', '=', true)
     .orderBy('o.nome')
@@ -49,6 +56,7 @@ export async function carregarUsuario(profileId: string): Promise<SessaoUsuario>
       codigo: o.codigo,
       papel: o.papel,
       estrelas: o.estrelas,
+      statusAssinatura: o.statusAssinatura,
     })),
     papelPlataforma,
   };

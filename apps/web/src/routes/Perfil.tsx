@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { formatarTelefone } from '@resenha05/shared';
 import { useAuth } from '../lib/auth';
 import { useOrg } from '../lib/org';
@@ -121,6 +121,22 @@ export function Perfil() {
             chave={`${usuario.fotoUrl ?? ''}|${usuario.fotoRecortada ? 1 : 0}|${usuario.timeCoracao ?? ''}`}
           />
         </section>
+      )}
+
+      {usuario?.papelPlataforma && (
+        <Link to="/admin">
+          <Card className="flex items-center justify-between gap-3 transition-shadow hover:shadow-pop">
+            <div>
+              <p className="font-display font-semibold uppercase tracking-[0.02em]">Administração da plataforma</p>
+              <p className="text-sm text-tinta-soft">
+                {usuario.papelPlataforma === 'dev' ? 'Você é o desenvolvedor.' : 'Você é admin da plataforma.'}
+              </p>
+            </div>
+            <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0 stroke-tinta-faint" fill="none" strokeWidth="2" strokeLinecap="round">
+              <path d="m9 6 6 6-6 6" />
+            </svg>
+          </Card>
+        </Link>
       )}
 
       <Card>
