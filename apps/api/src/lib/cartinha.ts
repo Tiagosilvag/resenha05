@@ -112,7 +112,7 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
   const statLateral = (a: (typeof ATRIBUTOS_CARTA)[number]): El =>
     h(
       'div',
-      { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 } },
+      { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0 } },
       h(
         'span',
         {
@@ -354,7 +354,7 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
           alignItems: 'center',
           padding: 46,
           // A ponta do escudo come as laterais embaixo: o conteúdo para antes.
-          paddingBottom: 168,
+          paddingBottom: recortada ? 100 : 168,
           position: 'relative',
           color: CRE,
           fontFamily: 'Barlow',
@@ -446,10 +446,10 @@ export async function renderCartinhaPng(dados: DadosCartinha): Promise<Buffer> {
       style: {
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         gap: 14,
         position: 'absolute',
-        left: 54,
+        left: 46,
         top: 226,
       },
     },
