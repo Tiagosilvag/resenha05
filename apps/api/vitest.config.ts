@@ -10,6 +10,8 @@ export default defineConfig({
       JWT_SECRET: 'segredo-de-teste-com-16+',
       JWT_REFRESH_SECRET: 'refresh-de-teste-com-16+',
       PLATAFORMA_DEV_TELEFONE: '11900000000',
+      // 32 bytes (0x01) em base64 — só pra testar a cifra de ida e volta.
+      RESENHA05_ENC_KEY: 'AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=',
     },
   },
 });

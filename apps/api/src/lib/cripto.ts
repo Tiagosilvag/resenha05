@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'node:crypto';
 import { env } from '../env.js';
+import { erro } from './erros.js';
 
 /**
  * Cifra simétrica do Access Token de Mercado Pago das organizações.
@@ -7,11 +8,42 @@ import { env } from '../env.js';
  * Guarda-se `cipher` (com a tag GCM anexada) e `nonce` separados no banco.
  */
 
-function chave(): Buffer {
-  if (!env.RESENHA05_ENC_KEY) {
-    throw new Error('RESENHA05_ENC_KEY não configurada — não é possível cifrar o token.');
+/** A chave do servidor está ausente ou com tamanho errado (nunca carrega o valor dela). */
+export class ChaveCriptoInvalida extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ChaveCriptoInvalida';
   }
-  return Buffer.from(env.RESENHA05_ENC_KEY, 'base64');
+}
+
+/** Confere a chave e diz exatamente o que está errado, sem expor o valor. */
+export function validarChave(base64: string | undefined): Buffer {
+  if (!base64) {
+    throw new ChaveCriptoInvalida(
+      'RESENHA05_ENC_KEY não está configurada no servidor (ausente ou vazia no container).',
+    );
+  }
+  const chave = Buffer.from(base64, 'base64');
+  if (chave.length !== 32) {
+    throw new ChaveCriptoInvalida(
+      `RESENHA05_ENC_KEY inválida: decodifica para ${chave.length} bytes, o esperado são 32 (gere com: openssl rand -base64 32).`,
+    );
+  }
+  return chave;
+}
+
+function chave(): Buffer {
+  return validarChave(env.RESENHA05_ENC_KEY);
+}
+
+/** Cifra para gravar no banco; se a chave do servidor estiver errada, devolve 422 com o motivo. */
+export function cifrarTokenOuErro(textoPuro: string): { cipher: Buffer; nonce: Buffer } {
+  try {
+    return cifrarToken(textoPuro);
+  } catch (e) {
+    if (e instanceof ChaveCriptoInvalida) throw erro.invalido(e.message);
+    throw e;
+  }
 }
 
 export function cifrarToken(textoPuro: string): { cipher: Buffer; nonce: Buffer } {

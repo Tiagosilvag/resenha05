@@ -9,7 +9,7 @@ import { db } from '../../db/index.js';
 import { exigirAdminPlataforma, exigirDev } from '../../plugins/auth.js';
 import { validar } from '../../lib/validar.js';
 import { erro } from '../../lib/erros.js';
-import { cifrarToken } from '../../lib/cripto.js';
+import { cifrarTokenOuErro } from '../../lib/cripto.js';
 
 export const rotasAdminPlataforma: FastifyPluginAsync = async (app) => {
   app.addHook('preHandler', app.autenticar);
@@ -110,13 +110,7 @@ export const rotasAdminPlataforma: FastifyPluginAsync = async (app) => {
 
   app.post('/admin/mercadopago', async (req) => {
     const { accessToken } = validar(conectarMercadoPagoGeralSchema, req.body);
-    let cipher: Buffer;
-    let nonce: Buffer;
-    try {
-      ({ cipher, nonce } = cifrarToken(accessToken));
-    } catch {
-      throw erro.invalido('Servidor sem chave de criptografia configurada (RESENHA05_ENC_KEY).');
-    }
+    const { cipher, nonce } = cifrarTokenOuErro(accessToken);
     await db
       .updateTable('plataforma_config')
       .set({
@@ -132,13 +126,7 @@ export const rotasAdminPlataforma: FastifyPluginAsync = async (app) => {
 
   app.post('/admin/mercadopago/webhook-secret', async (req) => {
     const { webhookSecret } = validar(configurarWebhookSecretSchema, req.body);
-    let cipher: Buffer;
-    let nonce: Buffer;
-    try {
-      ({ cipher, nonce } = cifrarToken(webhookSecret));
-    } catch {
-      throw erro.invalido('Servidor sem chave de criptografia configurada (RESENHA05_ENC_KEY).');
-    }
+    const { cipher, nonce } = cifrarTokenOuErro(webhookSecret);
     await db
       .updateTable('plataforma_config')
       .set({

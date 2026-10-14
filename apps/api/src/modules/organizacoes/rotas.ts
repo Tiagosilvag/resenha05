@@ -14,7 +14,7 @@ import { db } from '../../db/index.js';
 import { validar } from '../../lib/validar.js';
 import { erro } from '../../lib/erros.js';
 import { exigirAdmin, exigirDono, exigirMembro } from '../../plugins/auth.js';
-import { cifrarToken, decifrarToken } from '../../lib/cripto.js';
+import { cifrarTokenOuErro, decifrarToken } from '../../lib/cripto.js';
 import { criarPreapproval } from '../../lib/mercadopago-preapproval.js';
 import { exigirOrganizacaoLiberada, traduzirErroCobranca } from '../../lib/assinatura.js';
 import { primeiroDiaDoMesUtc } from '../../lib/periodo.js';
@@ -293,13 +293,7 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
     exigirDono(req, id);
     const { accessToken } = validar(conectarMercadoPagoSchema, req.body);
 
-    let cipher: Buffer;
-    let nonce: Buffer;
-    try {
-      ({ cipher, nonce } = cifrarToken(accessToken));
-    } catch {
-      throw erro.invalido('Servidor sem chave de criptografia configurada (RESENHA05_ENC_KEY).');
-    }
+    const { cipher, nonce } = cifrarTokenOuErro(accessToken);
     await db
       .updateTable('organizacoes')
       .set({
