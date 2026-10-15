@@ -19,6 +19,15 @@ export const cadastrarAdminPlataformaSchema = z.object({
   profileId: z.string().uuid(),
 });
 
+/**
+ * O Mercado Pago só cria a assinatura se o e-mail do pagador for de uma conta
+ * dele do mesmo tipo (teste ou real) que a conta vendedora — então o dono
+ * informa o e-mail da conta que vai pagar no checkout.
+ */
+export const iniciarCheckoutSchema = z.object({
+  payerEmail: z.string().trim().toLowerCase().email('Informe um e-mail válido.').max(254),
+});
+
 export const configurarWebhookSecretSchema = z.object({
   webhookSecret: z.string().trim().min(10, 'Segredo muito curto.').max(200),
 });

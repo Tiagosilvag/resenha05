@@ -8,6 +8,7 @@ import {
   removerMembroSchema,
   conectarMercadoPagoSchema,
   podeIniciarCheckout,
+  iniciarCheckoutSchema,
 } from '@resenha05/shared';
 import { db } from '../../db/index.js';
 import { validar } from '../../lib/validar.js';
@@ -315,6 +316,7 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
   app.post('/organizacoes/:id/assinatura/checkout', async (req) => {
     const { id } = req.params as { id: string };
     exigirDono(req, id);
+    const { payerEmail } = validar(iniciarCheckoutSchema, req.body);
 
     const org = await db
       .selectFrom('organizacoes')
@@ -338,9 +340,6 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
 
     const periodoStr = primeiroDiaDoMesUtc(new Date());
 
-    // O MP exige um e-mail no preapproval, mas o cadastro não coleta e-mail do
-    // dono: usa um sintético só para satisfazer o campo (quem interage é o
-    // dono, dentro do checkout do MP).
     let preapproval;
     try {
       const tokenGeral = decifrarToken(cfg.mp_geral_token_cipher, cfg.mp_geral_token_nonce);
@@ -348,7 +347,7 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
         accessToken: tokenGeral,
         reason: `Mensalidade Resenha05 - ${org.nome}`,
         externalReference: `${org.id}:${periodoStr}`,
-        payerEmail: req.usuario.telefone.replace(/\D/g, '') + '@resenha05.invalid',
+        payerEmail,
         valorCentavos: cfg.mensalidade_valor_centavos,
         backUrl: `${env.WEB_ORIGIN}/org/${org.id}/assinatura`,
       });

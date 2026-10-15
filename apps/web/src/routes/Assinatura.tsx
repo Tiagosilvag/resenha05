@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import type { StatusAssinatura } from '@resenha05/shared';
+import { iniciarCheckoutSchema, type StatusAssinatura } from '@resenha05/shared';
 import { useAuth } from '../lib/auth';
 import { useOrg } from '../lib/org';
 import { api, ApiError } from '../lib/api';
-import { Aviso, Button, Card, Chip, Spinner } from '../components/ui';
+import { Aviso, Button, Card, Chip, Field, Input, Spinner } from '../components/ui';
 
 interface Organizacao {
   id: string;
@@ -38,6 +38,7 @@ export function Assinatura() {
   const { usuario } = useAuth();
   const nav = useNavigate();
   const [erro, setErro] = useState<string | null>(null);
+  const [email, setEmail] = useState('');
 
   // Esta tela é da organização que está na URL — alinha o seletor do topo a ela.
   const { orgId: orgSelecionada, setOrgId } = useOrg();
@@ -55,7 +56,11 @@ export function Assinatura() {
   const souDono = vinculo?.papel === 'admin_principal';
 
   const checkout = useMutation({
-    mutationFn: () => api<{ checkoutUrl: string }>(`/organizacoes/${orgId}/assinatura/checkout`, { method: 'POST' }),
+    mutationFn: (payerEmail: string) =>
+      api<{ checkoutUrl: string }>(`/organizacoes/${orgId}/assinatura/checkout`, {
+        method: 'POST',
+        json: { payerEmail },
+      }),
     onSuccess: (resp) => {
       window.location.href = resp.checkoutUrl;
     },
@@ -82,9 +87,36 @@ export function Assinatura() {
 
         {org.statusAssinatura !== 'ativa' &&
           (souDono ? (
-            <Button onClick={() => checkout.mutate()} disabled={checkout.isPending}>
-              {checkout.isPending ? <Spinner /> : 'Pagar mensalidade'}
-            </Button>
+            <form
+              className="flex flex-col gap-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                setErro(null);
+                const parsed = iniciarCheckoutSchema.safeParse({ payerEmail: email });
+                if (!parsed.success) {
+                  setErro(parsed.error.issues[0]?.message ?? 'Informe um e-mail válido.');
+                  return;
+                }
+                checkout.mutate(parsed.data.payerEmail);
+              }}
+            >
+              <Field
+                label="E-mail da conta Mercado Pago"
+                dica="É a conta que vai pagar no checkout. No modo de teste, use o e-mail da conta compradora de teste."
+              >
+                <Input
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  placeholder="voce@exemplo.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </Field>
+              <Button type="submit" disabled={checkout.isPending}>
+                {checkout.isPending ? <Spinner /> : 'Pagar mensalidade'}
+              </Button>
+            </form>
           ) : (
             <Aviso tipo="info">Peça para o administrador principal da organização regularizar a mensalidade.</Aviso>
           ))}
