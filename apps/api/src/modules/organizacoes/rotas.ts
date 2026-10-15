@@ -347,7 +347,7 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
       });
     } catch (e) {
       req.log.error({ err: e }, 'Falha ao criar a assinatura no Mercado Pago');
-      throw traduzirErroCobranca(e);
+      throw traduzirErroCobranca(e, req.usuario.papelPlataforma != null);
     }
 
     await db

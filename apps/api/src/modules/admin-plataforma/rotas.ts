@@ -10,6 +10,8 @@ import { exigirAdminPlataforma, exigirDev } from '../../plugins/auth.js';
 import { validar } from '../../lib/validar.js';
 import { erro } from '../../lib/erros.js';
 import { cifrarTokenOuErro } from '../../lib/cripto.js';
+import { consultarConta } from '../../lib/mercadopago-conta.js';
+import { MercadoPagoErro } from '../../lib/mercadopago-preapproval.js';
 
 export const rotasAdminPlataforma: FastifyPluginAsync = async (app) => {
   app.addHook('preHandler', app.autenticar);
@@ -110,6 +112,22 @@ export const rotasAdminPlataforma: FastifyPluginAsync = async (app) => {
 
   app.post('/admin/mercadopago', async (req) => {
     const { accessToken } = validar(conectarMercadoPagoGeralSchema, req.body);
+
+    // Confere o token no MP antes de gravar: um token que ele não aceita só
+    // apareceria como falha no checkout, bem depois.
+    let conta;
+    try {
+      conta = await consultarConta(accessToken);
+    } catch (e) {
+      if (e instanceof MercadoPagoErro && (e.status === 401 || e.status === 403)) {
+        throw erro.invalido(
+          'O Mercado Pago não aceitou este token. Confira se você copiou o Access Token (e não a Public Key) e se ele é do ambiente certo.',
+        );
+      }
+      req.log.error({ err: e }, 'Falha ao validar o token do Mercado Pago');
+      throw erro.invalido('Não foi possível validar o token no Mercado Pago agora. Tente de novo.');
+    }
+
     const { cipher, nonce } = cifrarTokenOuErro(accessToken);
     await db
       .updateTable('plataforma_config')
@@ -121,7 +139,7 @@ export const rotasAdminPlataforma: FastifyPluginAsync = async (app) => {
       })
       .where('id', '=', 1)
       .execute();
-    return { ok: true };
+    return { ok: true, conta: conta.ehTeste ? 'teste' : 'real' };
   });
 
   app.post('/admin/mercadopago/webhook-secret', async (req) => {

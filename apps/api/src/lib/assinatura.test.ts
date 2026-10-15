@@ -35,4 +35,23 @@ describe('traduzirErroCobranca', () => {
   it('erro inesperado também vira 422 genérico', () => {
     expect((traduzirErroCobranca(new Error('boom')) as { status: number }).status).toBe(422);
   });
+
+  describe('para administrador da plataforma (detalhar)', () => {
+    it('mostra o motivo e o status que o Mercado Pago devolveu', () => {
+      const t = traduzirErroCobranca(new MercadoPagoErro('Both payer and collector must be real or test users', 400), true);
+      expect((t as { status: number }).status).toBe(422);
+      expect(t.message).toContain('Both payer and collector must be real or test users');
+      expect(t.message).toContain('400');
+    });
+
+    it('mostra a mensagem de um erro interno (ex: falha ao decifrar o token)', () => {
+      const t = traduzirErroCobranca(new Error('Unsupported state or unable to authenticate data'), true);
+      expect(t.message).toContain('Unsupported state or unable to authenticate data');
+    });
+
+    it('erro de aplicação continua passando como está', () => {
+      const original = erro.proibido('x');
+      expect(traduzirErroCobranca(original, true)).toBe(original);
+    });
+  });
 });

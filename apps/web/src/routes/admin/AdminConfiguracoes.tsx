@@ -40,15 +40,16 @@ export function AdminConfiguracoes() {
 
   const [accessToken, setAccessToken] = useState('');
   const [erroToken, setErroToken] = useState<string | null>(null);
-  const [okToken, setOkToken] = useState(false);
+  const [okToken, setOkToken] = useState<string | null>(null);
 
   const salvarToken = useMutation({
-    mutationFn: () => api('/admin/mercadopago', { method: 'POST', json: { accessToken } }),
-    onSuccess: () => {
+    mutationFn: () =>
+      api<{ ok: boolean; conta: 'teste' | 'real' }>('/admin/mercadopago', { method: 'POST', json: { accessToken } }),
+    onSuccess: (resp) => {
       qc.invalidateQueries({ queryKey: ['admin-configuracoes'] });
       setAccessToken('');
-      setOkToken(true);
-      setTimeout(() => setOkToken(false), 2500);
+      setOkToken(resp.conta === 'teste' ? 'Conta conectada: conta de TESTE (não cobra de verdade).' : 'Conta conectada: conta REAL.');
+      setTimeout(() => setOkToken(null), 6000);
     },
     onError: (e) => setErroToken(e instanceof ApiError ? e.message : 'Não foi possível conectar.'),
   });
@@ -111,7 +112,7 @@ export function AdminConfiguracoes() {
             : 'Ainda não conectada — as organizações não conseguem pagar a mensalidade até isso ser feito.'}
         </p>
         {erroToken && <Aviso tipo="erro">{erroToken}</Aviso>}
-        {okToken && <Aviso tipo="ok">Conta conectada.</Aviso>}
+        {okToken && <Aviso tipo="ok">{okToken}</Aviso>}
         <form
           className="mt-2 flex items-center gap-2"
           onSubmit={(e) => {

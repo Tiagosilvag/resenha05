@@ -32,7 +32,7 @@ export class MercadoPagoErro extends Error {
   }
 }
 
-async function erroDoMp(resp: { status: number; json: () => Promise<unknown> }): Promise<MercadoPagoErro> {
+export async function erroDoMp(resp: { status: number; json: () => Promise<unknown> }): Promise<MercadoPagoErro> {
   let mensagem = 'Erro desconhecido do Mercado Pago.';
   try {
     const j = (await resp.json()) as { message?: string };
