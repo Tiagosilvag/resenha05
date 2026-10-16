@@ -2,7 +2,8 @@ import type { FastifyPluginAsync } from 'fastify';
 import {
   sortearSchema,
   sortearTimes,
-  amplitudeEstrelas,
+  sortearTimesPorTamanho,
+  amplitudeEntreTimesCheios,
   peladaExigePagamento,
   statusNoSorteio,
   moverJogadorSorteioSchema,
@@ -51,7 +52,7 @@ export const rotasSorteio: FastifyPluginAsync = async (app) => {
     const { peladaId } = req.params as { peladaId: string };
     const pelada = await peladaComOrg(peladaId);
     exigirAdmin(req, pelada.organizacao_id);
-    const { nTimes, seed } = validar(sortearSchema, req.body);
+    const { nTimes, jogadoresPorTime, seed } = validar(sortearSchema, req.body);
 
     const vigente = await ultimoSorteio(peladaId);
     if (vigente?.confirmado) {
@@ -80,31 +81,38 @@ export const rotasSorteio: FastifyPluginAsync = async (app) => {
     const statusQueEntram = statusNoSorteio(pelada.valor);
     const elegiveis = confirmados.filter((c) => statusQueEntram.includes(c.status as 'confirmado' | 'pago'));
 
-    if (elegiveis.length < nTimes) {
+    const minimo = nTimes ?? (jogadoresPorTime! + 1);
+    if (elegiveis.length < minimo) {
+      const para = nTimes ? `${nTimes} times` : `2 times de ${jogadoresPorTime} (precisa de mais de ${jogadoresPorTime})`;
       if (peladaExigePagamento(pelada.valor)) {
         const semPagar = confirmados.length - elegiveis.length;
         throw erro.invalido(
-          `Só ${elegiveis.length} jogador(es) com pagamento confirmado para ${nTimes} times` +
+          `Só ${elegiveis.length} jogador(es) com pagamento confirmado para ${para}` +
             (semPagar > 0 ? ` (${semPagar} confirmado(s) ainda não pagaram).` : '.'),
         );
       }
-      throw erro.invalido(`Só ${elegiveis.length} confirmado(s) para ${nTimes} times.`);
+      throw erro.invalido(`Só ${elegiveis.length} confirmado(s) para ${para}.`);
     }
 
-    const timesSorteados = sortearTimes(
-      elegiveis.map((c) => ({
-        profileId: c.profileId,
-        nome: c.nome,
-        estrelas: c.estrelas ?? 3,
-      })),
-      nTimes,
-      seed !== undefined ? { seed } : {},
-    );
+    const jogadoresDoSorteio = elegiveis.map((c) => ({
+      profileId: c.profileId,
+      nome: c.nome,
+      estrelas: c.estrelas ?? 3,
+    }));
+    const opcoes = seed !== undefined ? { seed } : {};
+    let timesSorteados;
+    try {
+      timesSorteados = nTimes
+        ? sortearTimes(jogadoresDoSorteio, nTimes, opcoes)
+        : sortearTimesPorTamanho(jogadoresDoSorteio, jogadoresPorTime!, opcoes);
+    } catch (e) {
+      throw erro.invalido(e instanceof Error ? e.message : 'Não foi possível sortear.');
+    }
 
     const resultado = await db.transaction().execute(async (tx) => {
       const s = await tx
         .insertInto('sorteios')
-        .values({ pelada_id: peladaId, n_times: nTimes, criado_por: req.usuario.id })
+        .values({ pelada_id: peladaId, n_times: timesSorteados.length, criado_por: req.usuario.id })
         .returning('id')
         .executeTakeFirstOrThrow();
 
@@ -133,7 +141,7 @@ export const rotasSorteio: FastifyPluginAsync = async (app) => {
     reply.code(201);
     return {
       sorteioId: resultado,
-      amplitudeEstrelas: amplitudeEstrelas(timesSorteados),
+      amplitudeEstrelas: amplitudeEntreTimesCheios(timesSorteados),
       times: timesSorteados,
     };
   });

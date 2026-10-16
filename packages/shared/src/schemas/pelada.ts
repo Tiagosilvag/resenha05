@@ -58,10 +58,19 @@ export const mudarStatusPeladaSchema = z.object({
   status: z.enum(['aberta', 'fechada', 'realizada', 'cancelada']),
 });
 
-export const sortearSchema = z.object({
-  nTimes: z.number().int().min(2).max(32),
-  seed: z.number().int().optional(),
-});
+/**
+ * Ou `nTimes` (divide todo mundo em N times) ou `jogadoresPorTime` (times de
+ * exatamente N jogadores, mais um time com quem sobrar) — um dos dois.
+ */
+export const sortearSchema = z
+  .object({
+    nTimes: z.number().int().min(2).max(32).optional(),
+    jogadoresPorTime: z.number().int().min(1).max(100).optional(),
+    seed: z.number().int().optional(),
+  })
+  .refine((v) => (v.nTimes === undefined) !== (v.jogadoresPorTime === undefined), {
+    message: 'Informe o número de times ou o de jogadores por time.',
+  });
 export type SortearInput = z.infer<typeof sortearSchema>;
 
 /** Admin move um jogador de um time para outro do sorteio (ainda em rascunho). */

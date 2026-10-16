@@ -103,10 +103,85 @@ export function sortearTimes(
   return times;
 }
 
+function estrelasDe(j: JogadorSorteio): number {
+  return Math.min(5, Math.max(1, Math.round(j.estrelas)));
+}
+
+/**
+ * Sorteio por tamanho de time: formam-se tantos times de exatamente `porTime`
+ * jogadores quantos couberem (equilibrados por estrela) e quem sobra vai para um
+ * time extra, menor, numerado por último. Ex.: 11 jogadores com 5 por time →
+ * times de 5, 5 e 1. Quem sobra é escolhido por sorteio, não por estrela.
+ */
+export function sortearTimesPorTamanho(
+  jogadores: JogadorSorteio[],
+  porTime: number,
+  opcoes: OpcoesSorteio = {},
+): TimeSorteado[] {
+  if (!Number.isInteger(porTime) || porTime < 1) {
+    throw new Error('Jogadores por time deve ser um número inteiro maior que zero.');
+  }
+  const cheios = Math.floor(jogadores.length / porTime);
+  const resto = jogadores.length % porTime;
+  const total = cheios + (resto > 0 ? 1 : 0);
+  if (total < 2) {
+    throw new Error('Não dá para formar 2 times com esse número de jogadores.');
+  }
+  if (total > 32) {
+    throw new Error('Número de times deve estar entre 2 e 32.');
+  }
+
+  const semente = opcoes.seed ?? (Math.random() * 2 ** 32) >>> 0;
+  const rand = rng(semente);
+  const embaralhados = embaralhar(jogadores, rand);
+  const sobra = embaralhados.slice(0, resto);
+  const nosTimes = embaralhados.slice(resto);
+
+  const times: TimeSorteado[] =
+    cheios >= 2
+      ? sortearTimes(nosTimes, cheios, { seed: (rand() * 2 ** 32) >>> 0 })
+      : [
+          {
+            numero: 1,
+            jogadores: nosTimes,
+            totalEstrelas: nosTimes.reduce((s, j) => s + estrelasDe(j), 0),
+          },
+        ];
+
+  if (resto > 0) {
+    times.push({
+      numero: cheios + 1,
+      jogadores: sobra,
+      totalEstrelas: sobra.reduce((s, j) => s + estrelasDe(j), 0),
+    });
+  }
+  return times;
+}
+
 /** Diferença entre o time mais forte e o mais fraco (em estrelas). */
-export function amplitudeEstrelas(times: TimeSorteado[]): number {
+export function amplitudeEstrelas(times: { totalEstrelas: number }[]): number {
   const totais = times.map((t) => t.totalEstrelas);
   return Math.max(...totais) - Math.min(...totais);
+}
+
+/**
+ * Como `amplitudeEstrelas`, mas ignora o time da sobra: o último, quando é menor
+ * que os demais e eles têm todos o mesmo tamanho (senão a comparação não faria
+ * sentido, já que o time menor sempre soma menos estrelas).
+ */
+export function amplitudeEntreTimesCheios(
+  times: { numero: number; jogadores: unknown[]; totalEstrelas: number }[],
+): number {
+  if (times.length < 2) return 0;
+  const ordenados = [...times].sort((a, b) => a.numero - b.numero);
+  const ultimo = ordenados[ordenados.length - 1]!;
+  const anteriores = ordenados.slice(0, -1);
+  const tamanho = anteriores[0]!.jogadores.length;
+  const temSobra =
+    anteriores.length >= 2 &&
+    ultimo.jogadores.length < tamanho &&
+    anteriores.every((t) => t.jogadores.length === tamanho);
+  return amplitudeEstrelas(temSobra ? anteriores : ordenados);
 }
 
 /**
