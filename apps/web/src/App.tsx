@@ -9,6 +9,7 @@ import { Home } from './routes/Home';
 import { Perfil } from './routes/Perfil';
 import { CompletarCadastro } from './routes/CompletarCadastro';
 import { Administradores } from './routes/Administradores';
+import { PartidasPelada } from './routes/PartidasPelada';
 import { Peladas } from './routes/Peladas';
 import { Pelada } from './routes/Pelada';
 import { Torneios } from './routes/Torneios';
@@ -50,6 +51,7 @@ export function App() {
       <Route path="/perfil" element={<Protegida><Perfil /></Protegida>} />
       <Route path="/peladas" element={<Protegida><Peladas /></Protegida>} />
       <Route path="/peladas/:peladaId" element={<Protegida><Pelada /></Protegida>} />
+      <Route path="/peladas/:peladaId/partidas" element={<Protegida><PartidasPelada /></Protegida>} />
       <Route path="/torneios" element={<Protegida><Torneios /></Protegida>} />
       <Route path="/torneios/:torneioId" element={<Protegida><Torneio /></Protegida>} />
       <Route path="/jogos/:jogoId" element={<Protegida><Jogo /></Protegida>} />

@@ -90,6 +90,9 @@ export interface PeladasTable {
   local: string | null;
   valor: string | null;
   status: Generated<'aberta' | 'fechada' | 'realizada' | 'cancelada'>;
+  /** Regras de todas as partidas da pelada; null = sem limite. */
+  partida_duracao_min: number | null;
+  partida_gols_limite: number | null;
   criado_em: Generated<Timestamp>;
 }
 
@@ -162,8 +165,32 @@ export interface JogosTable {
   placar_a: number | null;
   placar_b: number | null;
   data: Timestamp | null;
-  status: Generated<'agendado' | 'em_andamento' | 'encerrado'>;
+  status: Generated<'agendado' | 'em_andamento' | 'pausado' | 'encerrado'>;
   criado_em: Generated<Timestamp>;
+  // Partida de pelada (times vêm do sorteio):
+  time_a_sorteio_id: string | null;
+  time_b_sorteio_id: string | null;
+  duracao_min: number | null;
+  gols_limite: number | null;
+  iniciado_em: Timestamp | null;
+  retomado_em: Timestamp | null;
+  acumulado_seg: Generated<number>;
+  encerrado_em: Timestamp | null;
+  encerramento: 'tempo' | 'gols' | 'manual' | null;
+  observacao: string | null;
+  vencedor_time_id: string | null;
+  perdedor_time_id: string | null;
+  concluido_em: Timestamp | null;
+  concluido_por: string | null;
+  redistribuicao: unknown | null;
+  criado_por: string | null;
+}
+
+export interface PartidaJogadoresTable {
+  jogo_id: string;
+  profile_id: string;
+  time_id: string;
+  estrelas: number;
 }
 
 export interface SumulaEventosTable {
@@ -174,6 +201,11 @@ export interface SumulaEventosTable {
   tipo: 'gol' | 'gol_contra' | 'assistencia' | 'cartao_amarelo' | 'cartao_vermelho';
   minuto: number | null;
   criado_em: Generated<Timestamp>;
+  /** Gol de pelada: time do sorteio que marcou. */
+  time_pelada_id: string | null;
+  criado_por: string | null;
+  removido_em: Timestamp | null;
+  removido_por: string | null;
 }
 
 export interface VEventosJogadorView {
@@ -183,6 +215,7 @@ export interface VEventosJogadorView {
   jogo_id: string;
   quando: Timestamp;
   organizacao_id: string | null;
+  pelada_id: string | null;
 }
 
 export interface PlataformaAdminsTable {
@@ -237,4 +270,5 @@ export interface Database {
   plataforma_admins: PlataformaAdminsTable;
   plataforma_config: PlataformaConfigTable;
   assinaturas: AssinaturasTable;
+  partida_jogadores: PartidaJogadoresTable;
 }

@@ -21,10 +21,21 @@ const MEDALHA = ['bg-ouro-500 text-white', 'bg-tinta-line text-tinta-soft', 'bg-
 export function Artilharia() {
   const { orgId } = useOrg();
   const [periodo, setPeriodo] = useState('mes');
+  // Vazio = todas; com uma pelada escolhida, o período não se aplica.
+  const [peladaId, setPeladaId] = useState('');
+
+  const peladas = useQuery({
+    queryKey: ['artilharia-peladas', orgId],
+    queryFn: () => api<{ peladaId: string; data: string; gols: number }[]>(`/organizacoes/${orgId}/artilharia/peladas`),
+    enabled: Boolean(orgId),
+  });
 
   const { data, isLoading } = useQuery({
-    queryKey: ['artilharia', orgId, periodo],
-    queryFn: () => api<ArtilhariaResp>(`/organizacoes/${orgId}/artilharia?periodo=${periodo}`),
+    queryKey: ['artilharia', orgId, periodo, peladaId],
+    queryFn: () =>
+      api<ArtilhariaResp>(
+        `/organizacoes/${orgId}/artilharia?periodo=${periodo}${peladaId ? `&peladaId=${peladaId}` : ''}`,
+      ),
     enabled: Boolean(orgId),
   });
 
@@ -37,12 +48,32 @@ export function Artilharia() {
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between gap-3">
         <h1 className="font-display text-2xl font-bold tracking-tight">Artilharia</h1>
-        <Select value={periodo} onChange={(e) => setPeriodo(e.target.value)} className="max-w-[10rem]">
+        <Select
+          value={periodo}
+          onChange={(e) => setPeriodo(e.target.value)}
+          disabled={Boolean(peladaId)}
+          className="max-w-[10rem]"
+        >
           <option value="mes">Este mês</option>
           <option value="ano">Este ano</option>
           <option value="sempre">Sempre</option>
         </Select>
       </div>
+
+      {(peladas.data?.length ?? 0) > 0 && (
+        <Select
+          aria-label="Filtrar por pelada"
+          value={peladaId}
+          onChange={(e) => setPeladaId(e.target.value)}
+        >
+          <option value="">Todas as peladas</option>
+          {peladas.data!.map((p) => (
+            <option key={p.peladaId} value={p.peladaId}>
+              Pelada de {new Date(p.data.slice(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR')} — {p.gols} gol(s)
+            </option>
+          ))}
+        </Select>
+      )}
 
       {isLoading ? (
         <Spinner className="h-6 w-6 text-campo-600" />

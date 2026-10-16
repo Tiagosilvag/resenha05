@@ -48,11 +48,12 @@ export const rotasEstatisticas: FastifyPluginAsync = async (app) => {
       .executeTakeFirst();
     if (!org) throw erro.naoEncontrado();
 
-    const pedido = (req.query as { periodo?: string }).periodo;
-    const periodo = pedido ?? org.periodo_artilharia;
+    const { periodo: pedido, peladaId } = req.query as { periodo?: string; peladaId?: string };
+    // Com uma pelada escolhida o recorte de tempo não se aplica: vale só ela.
+    const periodo = peladaId ? 'sempre' : (pedido ?? org.periodo_artilharia);
     const { de, ate } = intervaloDe(periodo);
 
-    const linhas = await db
+    let consulta = db
       .selectFrom('v_eventos_jogador as e')
       .innerJoin('profiles as p', 'p.id', 'e.profile_id')
       .select([
@@ -69,8 +70,9 @@ export const rotasEstatisticas: FastifyPluginAsync = async (app) => {
       .groupBy(['p.id', 'p.nome', 'p.foto_url', 'p.foto_recortada'])
       .having(sql<boolean>`count(*) filter (where e.tipo in ('gol','assistencia')) > 0`)
       .orderBy('gols', 'desc')
-      .orderBy('assistencias', 'desc')
-      .execute();
+      .orderBy('assistencias', 'desc');
+    if (peladaId) consulta = consulta.where('e.pelada_id', '=', peladaId);
+    const linhas = await consulta.execute();
 
     const ranking = linhas.map((l) => ({
       ...l,
@@ -85,6 +87,26 @@ export const rotasEstatisticas: FastifyPluginAsync = async (app) => {
       artilheiro,
       ranking,
     };
+  });
+
+  // Peladas com gols registrados, para escolher o recorte "uma pelada só".
+  app.get('/organizacoes/:id/artilharia/peladas', async (req) => {
+    const { id } = req.params as { id: string };
+    exigirMembro(req, id);
+    const linhas = await db
+      .selectFrom('v_eventos_jogador as e')
+      .innerJoin('peladas as p', 'p.id', 'e.pelada_id')
+      .select([
+        'p.id as peladaId',
+        'p.data as data',
+        sql<string>`count(*) filter (where e.tipo = 'gol')`.as('gols'),
+      ])
+      .where('e.organizacao_id', '=', id)
+      .groupBy(['p.id', 'p.data'])
+      .orderBy('p.data', 'desc')
+      .limit(50)
+      .execute();
+    return linhas.map((l) => ({ ...l, gols: Number(l.gols) }));
   });
 
   // Só o dono decide de quanto em quanto tempo a artilharia zera.

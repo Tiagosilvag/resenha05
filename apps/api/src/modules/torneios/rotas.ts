@@ -51,6 +51,11 @@ async function orgDoJogo(jogoId: string): Promise<{ orgId: string; torneioId: st
   return { orgId: (j.orgTorneio ?? j.orgPelada)!, torneioId: j.torneioId };
 }
 
+/** Jogos de pelada têm placar e gols próprios (tela de partidas da pelada). */
+function exigirJogoDeTorneio(torneioId: string | null): void {
+  if (!torneioId) throw erro.conflito('Esta partida é de uma pelada: use a tela de partidas dela.');
+}
+
 // Times não são divididos por fase (o mesmo elenco de times do torneio joga
 // em todas), então a classificação de uma fase é sempre calculada com todos
 // os times do torneio — só os jogos filtram pela fase.
@@ -208,8 +213,9 @@ export const rotasTorneios: FastifyPluginAsync = async (app) => {
 
   app.post('/jogos/:jogoId/placar', async (req) => {
     const { jogoId } = req.params as { jogoId: string };
-    const { orgId } = await orgDoJogo(jogoId);
+    const { orgId, torneioId } = await orgDoJogo(jogoId);
     exigirAdmin(req, orgId);
+    exigirJogoDeTorneio(torneioId);
     const d = validar(registrarPlacarSchema, req.body);
     await db
       .updateTable('jogos')
@@ -262,8 +268,9 @@ export const rotasTorneios: FastifyPluginAsync = async (app) => {
 
   app.post('/jogos/:jogoId/eventos', async (req, reply) => {
     const { jogoId } = req.params as { jogoId: string };
-    const { orgId } = await orgDoJogo(jogoId);
+    const { orgId, torneioId } = await orgDoJogo(jogoId);
     exigirAdmin(req, orgId);
+    exigirJogoDeTorneio(torneioId);
     const d = validar(eventoSumulaSchema, req.body);
     const ev = await db
       .insertInto('sumula_eventos')
@@ -282,8 +289,9 @@ export const rotasTorneios: FastifyPluginAsync = async (app) => {
 
   app.delete('/jogos/:jogoId/eventos/:eventoId', async (req, reply) => {
     const { jogoId, eventoId } = req.params as { jogoId: string; eventoId: string };
-    const { orgId } = await orgDoJogo(jogoId);
+    const { orgId, torneioId } = await orgDoJogo(jogoId);
     exigirAdmin(req, orgId);
+    exigirJogoDeTorneio(torneioId);
     await db
       .deleteFrom('sumula_eventos')
       .where('id', '=', eventoId)

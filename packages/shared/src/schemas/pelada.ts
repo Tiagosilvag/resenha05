@@ -78,3 +78,28 @@ export const moverJogadorSorteioSchema = z.object({
   profileId: z.string().uuid(),
   timeNumero: z.number().int().min(1).max(32),
 });
+
+/** Regras de todas as partidas de uma pelada; null/ausente = sem limite. */
+export const regrasPartidaSchema = z.object({
+  duracaoMin: z.number().int().min(1, 'Mínimo de 1 minuto.').max(180).nullable(),
+  golsLimite: z.number().int().min(1, 'Mínimo de 1 gol.').max(99).nullable(),
+});
+export type RegrasPartidaInput = z.infer<typeof regrasPartidaSchema>;
+
+export const criarPartidaSchema = z
+  .object({ timeAId: z.string().uuid(), timeBId: z.string().uuid() })
+  .refine((v) => v.timeAId !== v.timeBId, { message: 'Escolha dois times diferentes.' });
+
+export const golPartidaSchema = z.object({
+  timeId: z.string().uuid(),
+  profileId: z.string().uuid(),
+});
+
+export const encerrarPartidaSchema = z.object({
+  observacao: z.string().trim().max(200).optional(),
+});
+
+/** Time que perdeu (a redistribuição parte dele); null = empate/ninguém sai. */
+export const concluirPartidaSchema = z.object({
+  perdedorTimeId: z.string().uuid().nullable(),
+});

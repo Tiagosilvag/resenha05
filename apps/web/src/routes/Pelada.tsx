@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { amplitudeEntreTimesCheios, peladaExigePagamento, statusNoSorteio } from '@resenha05/shared';
 import { useAuth } from '../lib/auth';
@@ -455,6 +455,18 @@ function GradeDeTimes({
 }
 
 /** O que os participantes veem: só aparece depois que o admin confirma o sorteio. */
+/** Atalho para a tela de placar e cronômetro das partidas da pelada. */
+function LinkPartidas({ peladaId }: { peladaId: string }) {
+  return (
+    <Link
+      to={`/peladas/${peladaId}/partidas`}
+      className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-campo-300 bg-gramado-raised px-4 py-2.5 font-display text-[0.95rem] font-semibold uppercase tracking-[0.03em] text-campo-800 hover:bg-campo-50"
+    >
+      Partidas e placar
+    </Link>
+  );
+}
+
 function TimesConfirmados({ peladaId, orgId }: { peladaId: string; orgId: string }) {
   const [verCard, setVerCard] = useState<{ id: string; nome: string | null } | null>(null);
   const { data } = useQuery({
@@ -468,6 +480,7 @@ function TimesConfirmados({ peladaId, orgId }: { peladaId: string; orgId: string
     <Card as="section">
       <Eyebrow>Times do dia</Eyebrow>
       <p className="-mt-1 text-sm text-tinta-soft">Sorteio confirmado pelo organizador.</p>
+      <LinkPartidas peladaId={peladaId} />
       <BotaoBaixarArte peladaId={peladaId} />
       <GradeDeTimes times={data.times} onVerJogador={setVerCard} />
       {verCard && (
@@ -678,6 +691,7 @@ function PainelSorteio({
         </div>
       )}
 
+      {times.length > 0 && <LinkPartidas peladaId={peladaId} />}
       {times.length > 0 && <BotaoBaixarArte peladaId={peladaId} />}
 
       <GradeDeTimes

@@ -38,3 +38,4 @@ export interface OrganizacaoDoUsuario {
   estrelas: number;
   statusAssinatura: StatusAssinatura;
 }
+export * from './partida.js';

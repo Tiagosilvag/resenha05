@@ -220,6 +220,15 @@ export const rotasSorteio: FastifyPluginAsync = async (app) => {
     const sorteio = await ultimoSorteio(peladaId);
     if (!sorteio) throw erro.naoEncontrado('Esta pelada ainda não teve sorteio.');
     if (sorteio.confirmado) {
+      const aberta = await db
+        .selectFrom('jogos')
+        .select('id')
+        .where('pelada_id', '=', peladaId)
+        .where('concluido_em', 'is', null)
+        .executeTakeFirst();
+      if (aberta) {
+        throw erro.conflito('Há uma partida em aberto. Conclua-a antes de cancelar a confirmação do sorteio.');
+      }
       await db.updateTable('sorteios').set({ confirmado_em: null }).where('id', '=', sorteio.id).execute();
     }
     return { ok: true };
