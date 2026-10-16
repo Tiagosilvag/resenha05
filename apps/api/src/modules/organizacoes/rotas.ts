@@ -9,6 +9,10 @@ import {
   conectarMercadoPagoSchema,
   podeIniciarCheckout,
   iniciarCheckoutSchema,
+  criarJogadorEventoSchema,
+  redefinirSenhaJogadorSchema,
+  SENHA_PROVISORIA,
+  prazoSenhaProvisoria,
 } from '@resenha05/shared';
 import { db } from '../../db/index.js';
 import { validar } from '../../lib/validar.js';
@@ -18,6 +22,8 @@ import { cifrarTokenOuErro, decifrarToken } from '../../lib/cripto.js';
 import { criarPreapproval } from '../../lib/mercadopago-preapproval.js';
 import { exigirOrganizacaoLiberada, traduzirErroCobranca } from '../../lib/assinatura.js';
 import { primeiroDiaDoMesUtc } from '../../lib/periodo.js';
+import { hashSenha } from '../../lib/senha.js';
+import { revogarSessoes } from '../../lib/sessao.js';
 import { env } from '../../env.js';
 
 function ehViolacaoDeCheck(e: unknown): boolean {
@@ -136,8 +142,9 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
   // Qualquer membro pode ver a lista (visualização); ações seguem restritas a admins.
   app.get('/organizacoes/:id/membros', async (req) => {
     const { id } = req.params as { id: string };
-    exigirMembro(req, id);
-    return db
+    const vinculo = exigirMembro(req, id);
+    const souAdmin = vinculo.papel === 'admin' || vinculo.papel === 'admin_principal';
+    const membros = await db
       .selectFrom('organizacao_membros as m')
       .innerJoin('profiles as p', 'p.id', 'm.profile_id')
       .select([
@@ -146,6 +153,7 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
         'p.telefone as telefone',
         'p.foto_url as fotoUrl',
         'p.foto_recortada as fotoRecortada',
+        'p.senha_provisoria_ate as senhaProvisoriaAte',
         'm.papel as papel',
         'm.estrelas as estrelas',
         'm.ativo as ativo',
@@ -154,6 +162,83 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
       .orderBy('m.papel')
       .orderBy('p.nome')
       .execute();
+    // Quais contas ainda estão com a senha 123456 só interessa a quem administra
+    // — para os demais membros seria um mapa de contas fáceis de invadir.
+    return membros.map(({ senhaProvisoriaAte, ...m }) => ({
+      ...m,
+      senhaProvisoria: souAdmin && senhaProvisoriaAte !== null,
+    }));
+  });
+
+  // Admin cadastra um jogador (ex.: de um evento) só com nome e telefone. A conta
+  // nasce com a senha provisória e entra na organização como jogador.
+  app.post('/organizacoes/:id/jogadores-evento', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    exigirAdmin(req, id);
+    const { nome, telefone } = validar(criarJogadorEventoSchema, req.body);
+
+    const org = await db
+      .selectFrom('organizacoes')
+      .select('status_assinatura')
+      .where('id', '=', id)
+      .executeTakeFirstOrThrow();
+    exigirOrganizacaoLiberada(org.status_assinatura);
+
+    const validaAte = prazoSenhaProvisoria();
+    const senha_hash = await hashSenha(SENHA_PROVISORIA);
+    let profileId: string;
+    try {
+      profileId = await db.transaction().execute(async (tx) => {
+        const novo = await tx
+          .insertInto('profiles')
+          .values({ nome, telefone, senha_hash, senha_provisoria_ate: validaAte })
+          .returning('id')
+          .executeTakeFirstOrThrow();
+        await tx
+          .insertInto('organizacao_membros')
+          .values({ organizacao_id: id, profile_id: novo.id, papel: 'jogador' })
+          .execute();
+        return novo.id;
+      });
+    } catch (e) {
+      if ((e as { code?: string }).code === '23505') {
+        throw erro.conflito('Já existe uma conta com esse telefone. Use "Já tem cadastro?" para adicioná-la.');
+      }
+      throw e;
+    }
+
+    reply.code(201);
+    return { profileId, nome, telefone, senhaProvisoria: SENHA_PROVISORIA, validaAte };
+  });
+
+  // Volta a conta para a senha provisória. Só vale para contas que AINDA estão
+  // com a provisória (a pessoa nunca definiu a própria): senão um admin poderia
+  // tomar a conta de qualquer membro que tenha senha de verdade.
+  app.post('/organizacoes/:id/membros/redefinir-senha', async (req) => {
+    const { id } = req.params as { id: string };
+    exigirAdmin(req, id);
+    const { profileId } = validar(redefinirSenhaJogadorSchema, req.body);
+
+    const alvo = await db
+      .selectFrom('organizacao_membros as m')
+      .innerJoin('profiles as p', 'p.id', 'm.profile_id')
+      .select('p.senha_provisoria_ate as senhaProvisoriaAte')
+      .where('m.organizacao_id', '=', id)
+      .where('m.profile_id', '=', profileId)
+      .executeTakeFirst();
+    if (!alvo) throw erro.naoEncontrado('Membro não encontrado.');
+    if (alvo.senhaProvisoriaAte === null) {
+      throw erro.proibido('Só dá para redefinir a senha de quem ainda não definiu a própria.');
+    }
+
+    const validaAte = prazoSenhaProvisoria();
+    await db
+      .updateTable('profiles')
+      .set({ senha_hash: await hashSenha(SENHA_PROVISORIA), senha_provisoria_ate: validaAte })
+      .where('id', '=', profileId)
+      .execute();
+    await revogarSessoes(profileId);
+    return { senhaProvisoria: SENHA_PROVISORIA, validaAte };
   });
 
   // Admin busca (por nome ou telefone) contas já cadastradas para adicionar à organização.

@@ -18,6 +18,7 @@ export async function carregarUsuario(profileId: string): Promise<SessaoUsuario>
       'foto_recortada',
       'time_coracao',
       'telefone_verificado_em',
+      'senha_provisoria_ate',
     ])
     .where('id', '=', profileId)
     .executeTakeFirst();
@@ -59,6 +60,7 @@ export async function carregarUsuario(profileId: string): Promise<SessaoUsuario>
       statusAssinatura: o.statusAssinatura,
     })),
     papelPlataforma,
+    senhaProvisoria: p.senha_provisoria_ate != null,
   };
 }
 

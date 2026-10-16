@@ -1,11 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { MAX_ADMINS, formatarTelefone } from '@resenha05/shared';
+import {
+  DIAS_SENHA_PROVISORIA,
+  MAX_ADMINS,
+  SENHA_PROVISORIA,
+  criarJogadorEventoSchema,
+  formatarTelefone,
+  mascararTelefone,
+} from '@resenha05/shared';
 import { useAuth } from '../lib/auth';
 import { useOrg } from '../lib/org';
 import { api, ApiError } from '../lib/api';
-import { Aviso, Button, Card, Estrelas, Input, MiniCartinha, Spinner } from '../components/ui';
+import { Aviso, Button, Card, Chip, Estrelas, Field, Input, MiniCartinha, Spinner } from '../components/ui';
 import { PainelArtilheiro } from '../components/Artilheiro';
 
 interface Membro {
@@ -17,6 +24,8 @@ interface Membro {
   papel: 'jogador' | 'admin' | 'admin_principal';
   estrelas: number;
   ativo: boolean;
+  /** Só vem verdadeiro para quem administra: a conta ainda usa a senha provisória. */
+  senhaProvisoria: boolean;
 }
 
 interface PerfilEncontrado {
@@ -37,6 +46,10 @@ export function Administradores() {
   const [termoAdicionar, setTermoAdicionar] = useState('');
   const [termoDebounced, setTermoDebounced] = useState('');
   const [okAdicionar, setOkAdicionar] = useState<string | null>(null);
+  const [nomeEvento, setNomeEvento] = useState('');
+  const [telEvento, setTelEvento] = useState('');
+  const [erroEvento, setErroEvento] = useState<string | null>(null);
+  const [criado, setCriado] = useState<{ nome: string; senha: string; dias: number } | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setTermoDebounced(termoAdicionar.trim()), 300);
@@ -95,6 +108,39 @@ export function Administradores() {
       setTimeout(() => setOkAdicionar(null), 3000);
     },
     onError: (e) => setErro(e instanceof ApiError ? e.message : 'Não foi possível adicionar.'),
+  });
+
+  const criarJogador = useMutation({
+    mutationFn: (v: { nome: string; telefone: string }) =>
+      api<{ nome: string; senhaProvisoria: string }>(`/organizacoes/${orgId}/jogadores-evento`, {
+        method: 'POST',
+        json: v,
+      }),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ['membros', orgId] });
+      setNomeEvento('');
+      setTelEvento('');
+      setErroEvento(null);
+      setCriado({ nome: r.nome, senha: r.senhaProvisoria, dias: DIAS_SENHA_PROVISORIA });
+    },
+    onError: (e) => {
+      setCriado(null);
+      setErroEvento(e instanceof ApiError ? e.message : 'Não foi possível cadastrar.');
+    },
+  });
+
+  const redefinirSenha = useMutation({
+    mutationFn: (v: { profileId: string; nome: string | null }) =>
+      api<{ senhaProvisoria: string }>(`/organizacoes/${orgId}/membros/redefinir-senha`, {
+        method: 'POST',
+        json: { profileId: v.profileId },
+      }),
+    onSuccess: (r, v) => {
+      qc.invalidateQueries({ queryKey: ['membros', orgId] });
+      setErroEvento(null);
+      setCriado({ nome: v.nome ?? 'O jogador', senha: r.senhaProvisoria, dias: DIAS_SENHA_PROVISORIA });
+    },
+    onError: (e) => setErro(e instanceof ApiError ? e.message : 'Não foi possível redefinir a senha.'),
   });
 
   const remover = useMutation({
@@ -233,6 +279,54 @@ export function Administradores() {
         </Card>
       )}
 
+      {souAdmin && (
+        <Card>
+          <p className="eyebrow mb-1">Cadastrar jogador do evento</p>
+          <p className="mb-3 text-sm text-tinta-soft">
+            Só nome e telefone. A conta nasce com a senha provisória {SENHA_PROVISORIA}, que vale {DIAS_SENHA_PROVISORIA}{' '}
+            dias — no primeiro acesso a pessoa define a própria.
+          </p>
+          {erroEvento && <Aviso tipo="erro">{erroEvento}</Aviso>}
+          {criado && (
+            <Aviso tipo="ok">
+              <span>
+                {criado.nome}: senha provisória <strong>{criado.senha}</strong> (vale {criado.dias} dias).
+              </span>
+            </Aviso>
+          )}
+          <form
+            className="mt-2 flex flex-col gap-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setCriado(null);
+              const parsed = criarJogadorEventoSchema.safeParse({ nome: nomeEvento, telefone: telEvento });
+              if (!parsed.success) {
+                setErroEvento(parsed.error.issues[0]?.message ?? 'Confira os dados.');
+                return;
+              }
+              setErroEvento(null);
+              criarJogador.mutate({ nome: nomeEvento, telefone: telEvento });
+            }}
+          >
+            <Field label="Nome">
+              <Input value={nomeEvento} onChange={(e) => setNomeEvento(e.target.value)} />
+            </Field>
+            <Field label="Telefone (WhatsApp)">
+              <Input
+                inputMode="tel"
+                placeholder="(11) 91234-5678"
+                maxLength={15}
+                value={telEvento}
+                onChange={(e) => setTelEvento(mascararTelefone(e.target.value))}
+              />
+            </Field>
+            <Button type="submit" disabled={criarJogador.isPending}>
+              {criarJogador.isPending ? <Spinner /> : 'Cadastrar jogador'}
+            </Button>
+          </form>
+        </Card>
+      )}
+
       <Input placeholder="Buscar por nome ou telefone" value={busca} onChange={(e) => setBusca(e.target.value)} />
 
       <div className="flex flex-col gap-2">
@@ -256,6 +350,23 @@ export function Administradores() {
                   {m.papel.replace('_', ' ')}
                 </span>
               </div>
+
+              {souAdmin && m.senhaProvisoria && (
+                <div className="mt-2 flex items-center gap-2">
+                  <Chip tom="pendente">Senha provisória</Chip>
+                  <Button
+                    variante="secundario"
+                    className="!px-3 !py-1.5 !text-[0.8rem]"
+                    disabled={redefinirSenha.isPending}
+                    onClick={() => {
+                      if (!confirm(`Voltar a senha de ${m.nome ?? 'este jogador'} para ${SENHA_PROVISORIA}?`)) return;
+                      redefinirSenha.mutate({ profileId: m.profileId, nome: m.nome });
+                    }}
+                  >
+                    Redefinir senha
+                  </Button>
+                </div>
+              )}
 
               <div className="mt-3 flex flex-col gap-2">
                 <div className="flex items-center gap-2">

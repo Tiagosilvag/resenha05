@@ -20,6 +20,7 @@ import { EntrarOrg } from './routes/EntrarOrg';
 import { Assinatura } from './routes/Assinatura';
 import { OrganizacaoMercadoPago } from './routes/OrganizacaoMercadoPago';
 import { Admin } from './routes/Admin';
+import { DefinirSenha } from './routes/DefinirSenha';
 
 function Protegida({ children }: { children: ReactNode }) {
   const { usuario, carregando } = useAuth();
@@ -32,6 +33,8 @@ function Protegida({ children }: { children: ReactNode }) {
     );
   }
   if (!usuario) return <Navigate to="/entrar" state={{ de: loc.pathname }} replace />;
+  // Entrou com a senha provisória: nada do app até definir uma própria.
+  if (usuario.senhaProvisoria) return <DefinirSenha />;
   return <AppShell>{children}</AppShell>;
 }
 

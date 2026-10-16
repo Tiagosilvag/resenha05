@@ -10,6 +10,7 @@ export * from './schemas/admin-plataforma.js';
 export * from './classificacao.js';
 export * from './cartinha.js';
 export * from './assinatura.js';
+export * from './senha-provisoria.js';
 
 import type { StatusAssinatura } from './schemas/admin-plataforma.js';
 
@@ -24,6 +25,8 @@ export interface SessaoUsuario {
   telefoneVerificado: boolean;
   organizacoes: OrganizacaoDoUsuario[];
   papelPlataforma: 'dev' | 'admin' | null;
+  /** A conta ainda usa a senha provisória: o app obriga a definir uma própria. */
+  senhaProvisoria: boolean;
 }
 
 export interface OrganizacaoDoUsuario {

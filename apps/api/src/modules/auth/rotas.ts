@@ -1,5 +1,11 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { cadastroSchema, loginSchema, refreshSchema } from '@resenha05/shared';
+import {
+  cadastroSchema,
+  loginSchema,
+  refreshSchema,
+  definirSenhaSchema,
+  situacaoSenhaProvisoria,
+} from '@resenha05/shared';
 import { db } from '../../db/index.js';
 import { validar } from '../../lib/validar.js';
 import { erro } from '../../lib/erros.js';
@@ -74,15 +80,46 @@ export const rotasAuth: FastifyPluginAsync = async (app) => {
     const dados = validar(loginSchema, req.body);
     const p = await db
       .selectFrom('profiles')
-      .select(['id', 'senha_hash'])
+      .select(['id', 'senha_hash', 'senha_provisoria_ate'])
       .where('telefone', '=', dados.telefone)
       .executeTakeFirst();
 
     const ok = p ? await conferirSenha(p.senha_hash, dados.senha) : false;
     if (!p || !ok) throw erro.naoAutorizado('Telefone ou senha incorretos.');
 
+    // Só depois de a senha bater: não revela a quem erra a senha que a conta
+    // tem senha provisória.
+    if (situacaoSenhaProvisoria(p.senha_provisoria_ate) === 'expirada') {
+      throw erro.naoAutorizado('Sua senha provisória expirou. Peça ao organizador para redefinir.');
+    }
+
     const tokens = await emitirTokens(app, p.id, req.headers['user-agent'] ?? null);
     return { usuario: await carregarUsuario(p.id), ...tokens };
+  });
+
+  // Quem entrou com a senha provisória define a própria. As sessões antigas
+  // caem e a pessoa recebe uma nova, para continuar logada neste aparelho.
+  app.post('/auth/definir-senha', { preHandler: [app.autenticar] }, async (req) => {
+    const { senhaNova } = validar(definirSenhaSchema, req.body);
+
+    const p = await db
+      .selectFrom('profiles')
+      .select('senha_provisoria_ate')
+      .where('id', '=', req.usuario.id)
+      .executeTakeFirstOrThrow();
+    if (p.senha_provisoria_ate === null) {
+      throw erro.conflito('Sua senha já foi definida.');
+    }
+
+    await db
+      .updateTable('profiles')
+      .set({ senha_hash: await hashSenha(senhaNova), senha_provisoria_ate: null })
+      .where('id', '=', req.usuario.id)
+      .execute();
+
+    await revogarSessoes(req.usuario.id);
+    const tokens = await emitirTokens(app, req.usuario.id, req.headers['user-agent'] ?? null);
+    return { usuario: await carregarUsuario(req.usuario.id), ...tokens };
   });
 
   app.post('/auth/refresh', async (req) => {

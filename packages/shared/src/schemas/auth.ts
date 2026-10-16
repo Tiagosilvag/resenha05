@@ -39,3 +39,18 @@ export const trocarSenhaSchema = z.object({
   senhaAtual: z.string().min(1),
   senhaNova: senha,
 });
+
+/** Admin cadastra um jogador (ex.: de um evento) só com nome e telefone. */
+export const criarJogadorEventoSchema = z.object({
+  nome: z.string().trim().min(2, 'Informe o nome.').max(120),
+  telefone,
+});
+
+export const redefinirSenhaJogadorSchema = z.object({
+  profileId: z.string().uuid(),
+});
+
+/** Quem entrou com a senha provisória define a própria senha. */
+export const definirSenhaSchema = z.object({
+  senhaNova: senha,
+});

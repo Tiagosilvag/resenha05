@@ -11,6 +11,8 @@ export interface ProfilesTable {
   telefone: string;
   senha_hash: string;
   telefone_verificado_em: Timestamp | null;
+  /** Não nulo = ainda usa a senha provisória, válida até este instante. */
+  senha_provisoria_ate: Timestamp | null;
   foto_url: string | null;
   foto_recortada: Generated<boolean>;
   time_coracao: string | null;

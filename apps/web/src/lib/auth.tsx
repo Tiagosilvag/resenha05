@@ -20,6 +20,8 @@ interface AuthCtx {
   }) => Promise<void>;
   sair: () => Promise<void>;
   recarregar: () => Promise<void>;
+  /** Quem entrou com a senha provisória define a própria. */
+  definirSenha: (senhaNova: string) => Promise<void>;
 }
 
 const Ctx = createContext<AuthCtx | null>(null);
@@ -76,6 +78,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUsuario(null);
       },
       recarregar,
+      async definirSenha(senhaNova) {
+        await aplicar(
+          await api<RespostaAuth>('/auth/definir-senha', { method: 'POST', json: { senhaNova } }),
+        );
+      },
     }),
     [usuario, carregando],
   );
