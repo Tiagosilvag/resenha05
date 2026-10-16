@@ -153,3 +153,22 @@ function equilibrar(times: TimeSorteado[], maxPassos = 200): void {
     fraco.totalEstrelas += ganho;
   }
 }
+
+/**
+ * A pelada cobra algo? `valor` vem do banco como texto numérico ("30.00") ou
+ * null. Sem valor a pagar não existe "pago", então a regra de pagamento não
+ * se aplica.
+ */
+export function peladaExigePagamento(valor: string | number | null | undefined): boolean {
+  if (valor === null || valor === undefined || valor === '') return false;
+  const n = Number(valor);
+  return Number.isFinite(n) && n > 0;
+}
+
+/**
+ * Status de presença que entram no sorteio: numa pelada com valor, só quem já
+ * pagou; numa pelada sem valor, quem confirmou ou pagou. Quem desistiu nunca.
+ */
+export function statusNoSorteio(valor: string | number | null | undefined): ('confirmado' | 'pago')[] {
+  return peladaExigePagamento(valor) ? ['pago'] : ['confirmado', 'pago'];
+}

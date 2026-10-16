@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { sortearTimes, amplitudeEstrelas, type JogadorSorteio } from './sorteio.js';
+import {
+  sortearTimes,
+  amplitudeEstrelas,
+  peladaExigePagamento,
+  statusNoSorteio,
+  type JogadorSorteio,
+} from './sorteio.js';
 
 function gerar(dist: Record<number, number>): JogadorSorteio[] {
   const out: JogadorSorteio[] = [];
@@ -73,5 +79,43 @@ describe('sortearTimes', () => {
 
   it('rejeita menos jogadores que times', () => {
     expect(() => sortearTimes(gerar({ 3: 3 }), 4)).toThrow();
+  });
+});
+
+describe('peladaExigePagamento', () => {
+  it('exige quando a pelada tem valor maior que zero (texto numérico do banco ou número)', () => {
+    expect(peladaExigePagamento('30.00')).toBe(true);
+    expect(peladaExigePagamento('0.50')).toBe(true);
+    expect(peladaExigePagamento(30)).toBe(true);
+  });
+
+  it('não exige quando não há valor a pagar', () => {
+    expect(peladaExigePagamento(null)).toBe(false);
+    expect(peladaExigePagamento(undefined)).toBe(false);
+    expect(peladaExigePagamento('')).toBe(false);
+    expect(peladaExigePagamento('0')).toBe(false);
+    expect(peladaExigePagamento('0.00')).toBe(false);
+    expect(peladaExigePagamento(0)).toBe(false);
+  });
+
+  it('valor ilegível não conta como cobrança', () => {
+    expect(peladaExigePagamento('abc')).toBe(false);
+    expect(peladaExigePagamento('-5')).toBe(false);
+  });
+});
+
+describe('statusNoSorteio', () => {
+  it('pelada com valor: só quem pagou entra no sorteio', () => {
+    expect(statusNoSorteio('30.00')).toEqual(['pago']);
+  });
+
+  it('pelada sem valor: confirmados e pagos entram', () => {
+    expect(statusNoSorteio(null)).toEqual(['confirmado', 'pago']);
+    expect(statusNoSorteio('0.00')).toEqual(['confirmado', 'pago']);
+  });
+
+  it('desistiu nunca entra', () => {
+    expect(statusNoSorteio('30.00')).not.toContain('desistiu');
+    expect(statusNoSorteio(null)).not.toContain('desistiu');
   });
 });

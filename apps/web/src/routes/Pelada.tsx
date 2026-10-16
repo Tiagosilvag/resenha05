@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { peladaExigePagamento, statusNoSorteio } from '@resenha05/shared';
 import { useAuth } from '../lib/auth';
 import { api, ApiError, baixarPng } from '../lib/api';
 import { Aviso, Button, Card, Chip, Estrelas, Eyebrow, Input, MiniCartinha, Spinner, StatTile } from '../components/ui';
@@ -22,6 +23,7 @@ interface PeladaResp {
     data: string;
     hora: string | null;
     local: string | null;
+    valor: string | null;
   };
   presencas: Presenca[];
   minhaPresenca: Presenca | null;
@@ -33,6 +35,7 @@ export function Pelada() {
   const nav = useNavigate();
   const qc = useQueryClient();
   const [erro, setErro] = useState<string | null>(null);
+  const [filtro, setFiltro] = useState<'todos' | Presenca['status']>('todos');
   const [verCard, setVerCard] = useState<{ id: string; nome: string | null } | null>(null);
 
   const { data, isLoading } = useQuery({
@@ -95,6 +98,17 @@ export function Pelada() {
 
   const confirmados = data.presencas.filter((p) => p.status !== 'desistiu');
   const pagos = data.presencas.filter((p) => p.status === 'pago').length;
+  const exigePagamento = peladaExigePagamento(data.pelada.valor);
+  const entramNoSorteio = statusNoSorteio(data.pelada.valor);
+  const elegiveis = data.presencas.filter((p) => entramNoSorteio.includes(p.status as 'confirmado' | 'pago')).length;
+  const semPagar = data.presencas.filter((p) => p.status === 'confirmado').length;
+  const contagem: Record<'todos' | Presenca['status'], number> = {
+    todos: data.presencas.length,
+    confirmado: semPagar,
+    pago: pagos,
+    desistiu: data.presencas.filter((p) => p.status === 'desistiu').length,
+  };
+  const visiveis = filtro === 'todos' ? data.presencas : data.presencas.filter((p) => p.status === filtro);
   const dataFmt = new Date(data.pelada.data.slice(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR', {
     weekday: 'long',
     day: '2-digit',
@@ -188,8 +202,34 @@ export function Pelada() {
             Toque no status de um jogador para marcar que ele pagou.
           </p>
         )}
+        {admin && (
+          <div className="mb-2 flex flex-wrap gap-1.5" role="group" aria-label="Filtrar por status">
+            {(
+              [
+                ['todos', 'Todos'],
+                ['confirmado', 'Confirmado'],
+                ['pago', 'Pago'],
+                ['desistiu', 'Desistiu'],
+              ] as const
+            ).map(([valor, rotulo]) => (
+              <button
+                key={valor}
+                type="button"
+                aria-pressed={filtro === valor}
+                onClick={() => setFiltro(valor)}
+                className={`rounded-full border px-3 py-1 font-display text-xs font-semibold uppercase tracking-[0.04em] transition-colors ${
+                  filtro === valor
+                    ? 'border-campo-400 bg-campo-50 text-campo-800'
+                    : 'border-tinta-line text-tinta-soft hover:bg-campo-50/60'
+                }`}
+              >
+                {rotulo} ({contagem[valor]})
+              </button>
+            ))}
+          </div>
+        )}
         <div className="divide-y divide-tinta-line/60 overflow-hidden rounded-2xl border border-tinta-line/70 bg-gramado-raised">
-          {data.presencas.map((p, i) => (
+          {visiveis.map((p, i) => (
             <div
               key={p.profileId}
               className={`flex items-center gap-2 px-3 py-2.5 ${p.status === 'desistiu' ? 'opacity-55' : ''}`}
@@ -248,6 +288,9 @@ export function Pelada() {
           {data.presencas.length === 0 && (
             <p className="px-3.5 py-6 text-center text-sm text-tinta-faint">Ninguém confirmou ainda.</p>
           )}
+          {data.presencas.length > 0 && visiveis.length === 0 && (
+            <p className="px-3.5 py-6 text-center text-sm text-tinta-faint">Ninguém com esse status.</p>
+          )}
         </div>
       </section>
 
@@ -255,7 +298,9 @@ export function Pelada() {
         <PainelSorteio
           peladaId={peladaId}
           orgId={data.pelada.organizacao_id}
-          confirmados={confirmados.length}
+          elegiveis={elegiveis}
+          exigePagamento={exigePagamento}
+          semPagar={semPagar}
         />
       )}
 
@@ -308,11 +353,16 @@ interface TimeResultado {
 function PainelSorteio({
   peladaId,
   orgId,
-  confirmados,
+  elegiveis,
+  exigePagamento,
+  semPagar,
 }: {
   peladaId: string;
   orgId: string;
-  confirmados: number;
+  /** Quantos entram no sorteio (só pagos, se a pelada cobra; senão confirmados e pagos). */
+  elegiveis: number;
+  exigePagamento: boolean;
+  semPagar: number;
 }) {
   const qc = useQueryClient();
   const [modo, setModo] = useState<'times' | 'porTime'>('times');
@@ -328,8 +378,8 @@ function PainelSorteio({
     ? 0
     : modo === 'times'
       ? Math.max(2, Math.min(32, Math.round(digitado)))
-      : Math.max(2, Math.min(32, Math.round(confirmados / Math.round(digitado)) || 2));
-  const porTime = nTimes > 0 ? Math.round(confirmados / nTimes) : 0;
+      : Math.max(2, Math.min(32, Math.round(elegiveis / Math.round(digitado)) || 2));
+  const porTime = nTimes > 0 ? Math.round(elegiveis / nTimes) : 0;
 
   function trocarModo(novo: 'times' | 'porTime') {
     setModo(novo);
@@ -358,7 +408,13 @@ function PainelSorteio({
   return (
     <Card as="section">
       <Eyebrow>Sorteio de times</Eyebrow>
-      <p className="-mt-1 text-sm text-tinta-soft">{confirmados} confirmado(s) para dividir.</p>
+      <p className="-mt-1 text-sm text-tinta-soft">
+        {exigePagamento
+          ? `${elegiveis} pago(s) para dividir. Só quem está como pago entra no sorteio${
+              semPagar > 0 ? ` — ${semPagar} confirmado(s) sem pagar ficam de fora` : ''
+            }.`
+          : `${elegiveis} confirmado(s) para dividir.`}
+      </p>
       {erro && <div className="mt-2"><Aviso tipo="erro">{erro}</Aviso></div>}
 
       <div className="mt-3 flex gap-2">
@@ -402,7 +458,7 @@ function PainelSorteio({
         </Button>
       </div>
 
-      {valido && confirmados > 0 && (
+      {valido && elegiveis > 0 && (
         <p className="mt-1.5 text-xs text-tinta-faint">
           Vai dar {nTimes} time(s) de ~{porTime} jogador(es).
         </p>

@@ -1,5 +1,11 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { sortearSchema, sortearTimes, amplitudeEstrelas } from '@resenha05/shared';
+import {
+  sortearSchema,
+  sortearTimes,
+  amplitudeEstrelas,
+  peladaExigePagamento,
+  statusNoSorteio,
+} from '@resenha05/shared';
 import { db } from '../../db/index.js';
 import { validar } from '../../lib/validar.js';
 import { erro } from '../../lib/erros.js';
@@ -15,7 +21,7 @@ function dataPorExtenso(iso: string): string {
 async function peladaComOrg(peladaId: string) {
   const p = await db
     .selectFrom('peladas')
-    .select(['id', 'organizacao_id'])
+    .select(['id', 'organizacao_id', 'valor'])
     .where('id', '=', peladaId)
     .executeTakeFirst();
   if (!p) throw erro.naoEncontrado('Pelada não encontrada.');
@@ -39,17 +45,33 @@ export const rotasSorteio: FastifyPluginAsync = async (app) => {
           .onRef('m.profile_id', '=', 'pr.profile_id')
           .on('m.organizacao_id', '=', pelada.organizacao_id),
       )
-      .select(['pr.profile_id as profileId', 'p.nome as nome', 'm.estrelas as estrelas'])
+      .select([
+        'pr.profile_id as profileId',
+        'p.nome as nome',
+        'm.estrelas as estrelas',
+        'pr.status as status',
+      ])
       .where('pr.pelada_id', '=', peladaId)
       .where('pr.status', 'in', ['confirmado', 'pago'])
       .execute();
 
-    if (confirmados.length < nTimes) {
-      throw erro.invalido(`Só ${confirmados.length} confirmado(s) para ${nTimes} times.`);
+    // Pelada com valor: só quem está como "pago" entra no sorteio.
+    const statusQueEntram = statusNoSorteio(pelada.valor);
+    const elegiveis = confirmados.filter((c) => statusQueEntram.includes(c.status as 'confirmado' | 'pago'));
+
+    if (elegiveis.length < nTimes) {
+      if (peladaExigePagamento(pelada.valor)) {
+        const semPagar = confirmados.length - elegiveis.length;
+        throw erro.invalido(
+          `Só ${elegiveis.length} jogador(es) com pagamento confirmado para ${nTimes} times` +
+            (semPagar > 0 ? ` (${semPagar} confirmado(s) ainda não pagaram).` : '.'),
+        );
+      }
+      throw erro.invalido(`Só ${elegiveis.length} confirmado(s) para ${nTimes} times.`);
     }
 
     const timesSorteados = sortearTimes(
-      confirmados.map((c) => ({
+      elegiveis.map((c) => ({
         profileId: c.profileId,
         nome: c.nome,
         estrelas: c.estrelas ?? 3,
