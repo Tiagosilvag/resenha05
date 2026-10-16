@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify';
+import { sql } from 'kysely';
 import {
   cadastrarAdminPlataformaSchema,
   configurarMensalidadeSchema,
@@ -79,6 +80,86 @@ export const rotasAdminPlataforma: FastifyPluginAsync = async (app) => {
     }
 
     return query.execute();
+  });
+
+  // Detalhe somente leitura de uma organização — qualquer admin de plataforma
+  // vê, sem precisar ser membro dela.
+  app.get('/admin/organizacoes/:id', async (req) => {
+    const { id } = req.params as { id: string };
+    // id que não é uuid estouraria no Postgres (22P02 → 500); é só "não existe".
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+      throw erro.naoEncontrado('Organização não encontrada.');
+    }
+
+    const org = await db
+      .selectFrom('organizacoes as o')
+      .innerJoin('profiles as p', 'p.id', 'o.dono_id')
+      .select([
+        'o.id',
+        'o.nome',
+        'o.codigo',
+        'o.status_assinatura as statusAssinatura',
+        'o.criado_em as criadoEm',
+        'o.mp_token_atualizado_em as mpAtualizadoEm',
+        'p.id as donoId',
+        'p.nome as donoNome',
+        'p.telefone as donoTelefone',
+      ])
+      .where('o.id', '=', id)
+      .executeTakeFirst();
+    if (!org) throw erro.naoEncontrado('Organização não encontrada.');
+
+    const [membros, peladas, torneios, assinaturas] = await Promise.all([
+      db
+        .selectFrom('organizacao_membros')
+        .select([
+          db.fn.countAll<string>().as('membros'),
+          sql<string>`count(*) filter (where papel in ('admin', 'admin_principal'))`.as('admins'),
+        ])
+        .where('organizacao_id', '=', id)
+        .where('ativo', '=', true)
+        .executeTakeFirstOrThrow(),
+      db
+        .selectFrom('peladas')
+        .select(db.fn.countAll<string>().as('total'))
+        .where('organizacao_id', '=', id)
+        .executeTakeFirstOrThrow(),
+      db
+        .selectFrom('torneios')
+        .select(db.fn.countAll<string>().as('total'))
+        .where('organizacao_id', '=', id)
+        .executeTakeFirstOrThrow(),
+      db
+        .selectFrom('assinaturas')
+        .select([
+          'periodo_referencia as periodoReferencia',
+          'status',
+          'valor_centavos as valorCentavos',
+          'atualizado_em as atualizadoEm',
+        ])
+        .where('organizacao_id', '=', id)
+        .orderBy('periodo_referencia', 'desc')
+        .orderBy('criado_em', 'desc')
+        .limit(12)
+        .execute(),
+    ]);
+
+    return {
+      id: org.id,
+      nome: org.nome,
+      codigo: org.codigo,
+      statusAssinatura: org.statusAssinatura,
+      criadoEm: org.criadoEm,
+      dono: { profileId: org.donoId, nome: org.donoNome, telefone: org.donoTelefone },
+      totais: {
+        membros: Number(membros.membros),
+        admins: Number(membros.admins),
+        peladas: Number(peladas.total),
+        torneios: Number(torneios.total),
+      },
+      mercadoPagoDaOrganizacaoConectado: org.mpAtualizadoEm != null,
+      assinaturas,
+    };
   });
 
   app.get('/admin/configuracoes', async () => {
