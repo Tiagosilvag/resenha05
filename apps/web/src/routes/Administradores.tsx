@@ -89,10 +89,24 @@ export function Administradores() {
     onError: (e) => setErro(e instanceof ApiError ? e.message : 'Erro.'),
   });
 
+  // Otimista: com − / + em toques seguidos, cada toque precisa partir do valor
+  // que o admin acabou de ver, não do que o servidor ainda não confirmou.
   const estrelas = useMutation({
     mutationFn: (v: { profileId: string; estrelas: number }) =>
       api(`/organizacoes/${orgId}/membros/estrelas`, { method: 'POST', json: v }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['membros', orgId] }),
+    onMutate: async (v) => {
+      await qc.cancelQueries({ queryKey: ['membros', orgId] });
+      const anterior = qc.getQueryData<Membro[]>(['membros', orgId]);
+      qc.setQueryData<Membro[]>(['membros', orgId], (lista) =>
+        lista?.map((m) => (m.profileId === v.profileId ? { ...m, estrelas: v.estrelas } : m)),
+      );
+      return { anterior };
+    },
+    onError: (e, _v, ctx) => {
+      if (ctx?.anterior) qc.setQueryData(['membros', orgId], ctx.anterior);
+      setErro(e instanceof ApiError ? e.message : 'Não foi possível mudar as estrelas.');
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['membros', orgId] }),
   });
 
   const adicionar = useMutation({
@@ -370,18 +384,28 @@ export function Administradores() {
 
               <div className="mt-3 flex flex-col gap-2">
                 <div className="flex items-center gap-2">
+                  {souAdmin && (
+                    <button
+                      type="button"
+                      aria-label={`Diminuir estrelas de ${m.nome ?? 'jogador'}`}
+                      disabled={m.estrelas <= 1}
+                      onClick={() => estrelas.mutate({ profileId: m.profileId, estrelas: m.estrelas - 1 })}
+                      className="grid h-8 w-8 place-items-center rounded-lg border border-campo-300 bg-gramado-raised text-lg font-bold leading-none text-campo-800 hover:bg-campo-50 disabled:opacity-40"
+                    >
+                      −
+                    </button>
+                  )}
                   <Estrelas n={m.estrelas} />
                   {souAdmin && (
-                    <input
-                      type="range"
-                      min={1}
-                      max={5}
-                      value={m.estrelas}
-                      onChange={(e) =>
-                        estrelas.mutate({ profileId: m.profileId, estrelas: Number(e.target.value) })
-                      }
-                      className="w-24 accent-campo-600"
-                    />
+                    <button
+                      type="button"
+                      aria-label={`Aumentar estrelas de ${m.nome ?? 'jogador'}`}
+                      disabled={m.estrelas >= 5}
+                      onClick={() => estrelas.mutate({ profileId: m.profileId, estrelas: m.estrelas + 1 })}
+                      className="grid h-8 w-8 place-items-center rounded-lg border border-campo-300 bg-gramado-raised text-lg font-bold leading-none text-campo-800 hover:bg-campo-50 disabled:opacity-40"
+                    >
+                      +
+                    </button>
                   )}
                 </div>
 
