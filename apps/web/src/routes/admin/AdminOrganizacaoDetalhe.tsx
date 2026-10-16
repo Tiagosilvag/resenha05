@@ -103,8 +103,13 @@ export function AdminOrganizacaoDetalhe({ id }: { id: string }) {
                 ? 'Ativa, sem vencimento (organização anterior à cobrança).'
                 : 'Sem mensalidade em dia.'}
         </p>
+        {data.pagaPeloMercadoPago && data.liberadaManualmenteAte && (
+          <p className="text-xs text-tinta-faint">
+            Liberação manual também registrada até {dataBr(data.liberadaManualmenteAte)}.
+          </p>
+        )}
         {erro && <div className="mt-2"><Aviso tipo="erro">{erro}</Aviso></div>}
-        {!data.pagaPeloMercadoPago && proximoMes && (
+        {proximoMes && (
           <Button
             variante="secundario"
             className="mt-2 w-full"
