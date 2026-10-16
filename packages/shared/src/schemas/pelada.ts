@@ -63,3 +63,9 @@ export const sortearSchema = z.object({
   seed: z.number().int().optional(),
 });
 export type SortearInput = z.infer<typeof sortearSchema>;
+
+/** Admin move um jogador de um time para outro do sorteio (ainda em rascunho). */
+export const moverJogadorSorteioSchema = z.object({
+  profileId: z.string().uuid(),
+  timeNumero: z.number().int().min(1).max(32),
+});

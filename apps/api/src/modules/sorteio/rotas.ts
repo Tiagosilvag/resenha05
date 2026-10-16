@@ -5,12 +5,17 @@ import {
   amplitudeEstrelas,
   peladaExigePagamento,
   statusNoSorteio,
+  moverJogadorSorteioSchema,
 } from '@resenha05/shared';
 import { db } from '../../db/index.js';
 import { validar } from '../../lib/validar.js';
 import { erro } from '../../lib/erros.js';
 import { exigirAdmin, exigirMembro } from '../../plugins/auth.js';
 import { renderSorteioArtePng, type TimeArte } from '../../lib/sorteio-arte.js';
+
+function ehAdmin(papel: string): boolean {
+  return papel === 'admin' || papel === 'admin_principal';
+}
 
 function dataPorExtenso(iso: string): string {
   const d = new Date(iso.slice(0, 10) + 'T12:00:00');
@@ -28,6 +33,17 @@ async function peladaComOrg(peladaId: string) {
   return p;
 }
 
+/** O sorteio mais recente da pelada (o que vale), com se está confirmado. */
+async function ultimoSorteio(peladaId: string) {
+  const s = await db
+    .selectFrom('sorteios')
+    .select(['id', 'n_times', 'criado_em', 'confirmado_em'])
+    .where('pelada_id', '=', peladaId)
+    .orderBy('criado_em', 'desc')
+    .executeTakeFirst();
+  return s ? { ...s, confirmado: s.confirmado_em !== null } : null;
+}
+
 export const rotasSorteio: FastifyPluginAsync = async (app) => {
   app.addHook('preHandler', app.autenticar);
 
@@ -36,6 +52,11 @@ export const rotasSorteio: FastifyPluginAsync = async (app) => {
     const pelada = await peladaComOrg(peladaId);
     exigirAdmin(req, pelada.organizacao_id);
     const { nTimes, seed } = validar(sortearSchema, req.body);
+
+    const vigente = await ultimoSorteio(peladaId);
+    if (vigente?.confirmado) {
+      throw erro.conflito('O sorteio está confirmado. Cancele a confirmação para refazer.');
+    }
 
     const confirmados = await db
       .selectFrom('presencas as pr')
@@ -120,15 +141,11 @@ export const rotasSorteio: FastifyPluginAsync = async (app) => {
   app.get('/peladas/:peladaId/sorteio', async (req) => {
     const { peladaId } = req.params as { peladaId: string };
     const pelada = await peladaComOrg(peladaId);
-    exigirMembro(req, pelada.organizacao_id);
+    const vinculo = exigirMembro(req, pelada.organizacao_id);
 
-    const sorteio = await db
-      .selectFrom('sorteios')
-      .select(['id', 'n_times', 'criado_em'])
-      .where('pelada_id', '=', peladaId)
-      .orderBy('criado_em', 'desc')
-      .executeTakeFirst();
-    if (!sorteio) return { sorteio: null, times: [] };
+    // Rascunho só para administradores; os participantes veem depois de confirmado.
+    const sorteio = await ultimoSorteio(peladaId);
+    if (!sorteio || (!ehAdmin(vinculo.papel) && !sorteio.confirmado)) return { sorteio: null, times: [] };
 
     const linhas = await db
       .selectFrom('times as t')
@@ -163,7 +180,82 @@ export const rotasSorteio: FastifyPluginAsync = async (app) => {
         time.totalEstrelas += l.estrelas ?? 0;
       }
     }
-    return { sorteio, times: [...mapa.values()].sort((a, b) => a.numero - b.numero) };
+    return {
+      sorteio: {
+        id: sorteio.id,
+        n_times: sorteio.n_times,
+        criado_em: sorteio.criado_em,
+        confirmado: sorteio.confirmado,
+      },
+      times: [...mapa.values()].sort((a, b) => a.numero - b.numero),
+    };
+  });
+
+  // Publica o sorteio: a partir daqui os participantes veem os times.
+  app.post('/peladas/:peladaId/sorteio/confirmar', async (req) => {
+    const { peladaId } = req.params as { peladaId: string };
+    const pelada = await peladaComOrg(peladaId);
+    exigirAdmin(req, pelada.organizacao_id);
+    const sorteio = await ultimoSorteio(peladaId);
+    if (!sorteio) throw erro.naoEncontrado('Esta pelada ainda não teve sorteio.');
+    if (!sorteio.confirmado) {
+      await db.updateTable('sorteios').set({ confirmado_em: new Date() }).where('id', '=', sorteio.id).execute();
+    }
+    return { ok: true };
+  });
+
+  // Volta o sorteio a rascunho: some para os participantes e libera refazer/editar.
+  app.post('/peladas/:peladaId/sorteio/cancelar-confirmacao', async (req) => {
+    const { peladaId } = req.params as { peladaId: string };
+    const pelada = await peladaComOrg(peladaId);
+    exigirAdmin(req, pelada.organizacao_id);
+    const sorteio = await ultimoSorteio(peladaId);
+    if (!sorteio) throw erro.naoEncontrado('Esta pelada ainda não teve sorteio.');
+    if (sorteio.confirmado) {
+      await db.updateTable('sorteios').set({ confirmado_em: null }).where('id', '=', sorteio.id).execute();
+    }
+    return { ok: true };
+  });
+
+  // Ajuste manual: passa um jogador de um time para outro (só no rascunho).
+  app.post('/peladas/:peladaId/sorteio/mover', async (req) => {
+    const { peladaId } = req.params as { peladaId: string };
+    const pelada = await peladaComOrg(peladaId);
+    exigirAdmin(req, pelada.organizacao_id);
+    const { profileId, timeNumero } = validar(moverJogadorSorteioSchema, req.body);
+
+    const sorteio = await ultimoSorteio(peladaId);
+    if (!sorteio) throw erro.naoEncontrado('Esta pelada ainda não teve sorteio.');
+    if (sorteio.confirmado) {
+      throw erro.conflito('O sorteio está confirmado. Cancele a confirmação para editar os times.');
+    }
+
+    const destino = await db
+      .selectFrom('times')
+      .select('id')
+      .where('sorteio_id', '=', sorteio.id)
+      .where('numero', '=', timeNumero)
+      .executeTakeFirst();
+    if (!destino) throw erro.naoEncontrado(`O time ${timeNumero} não existe neste sorteio.`);
+
+    const atual = await db
+      .selectFrom('time_jogadores as tj')
+      .innerJoin('times as t', 't.id', 'tj.time_id')
+      .select('tj.time_id as timeId')
+      .where('t.sorteio_id', '=', sorteio.id)
+      .where('tj.profile_id', '=', profileId)
+      .executeTakeFirst();
+    if (!atual) throw erro.naoEncontrado('Este jogador não está neste sorteio.');
+
+    if (atual.timeId !== destino.id) {
+      await db
+        .updateTable('time_jogadores')
+        .set({ time_id: destino.id })
+        .where('time_id', '=', atual.timeId)
+        .where('profile_id', '=', profileId)
+        .execute();
+    }
+    return { ok: true };
   });
 
   // Arte compartilhável do último sorteio da pelada.
@@ -176,15 +268,12 @@ export const rotasSorteio: FastifyPluginAsync = async (app) => {
       .where('pl.id', '=', peladaId)
       .executeTakeFirst();
     if (!pelada) throw erro.naoEncontrado('Pelada não encontrada.');
-    exigirMembro(req, pelada.organizacao_id);
+    const vinculo = exigirMembro(req, pelada.organizacao_id);
 
-    const sorteio = await db
-      .selectFrom('sorteios')
-      .select('id')
-      .where('pelada_id', '=', peladaId)
-      .orderBy('criado_em', 'desc')
-      .executeTakeFirst();
-    if (!sorteio) throw erro.naoEncontrado('Esta pelada ainda não teve sorteio.');
+    const sorteio = await ultimoSorteio(peladaId);
+    if (!sorteio || (!ehAdmin(vinculo.papel) && !sorteio.confirmado)) {
+      throw erro.naoEncontrado('Esta pelada ainda não teve sorteio.');
+    }
 
     const linhas = await db
       .selectFrom('times as t')

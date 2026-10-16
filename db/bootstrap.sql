@@ -646,5 +646,22 @@ comment on column profiles.senha_provisoria_ate is
 INSERT INTO _migrations (nome) VALUES ('0012_senha_provisoria.sql') ON CONFLICT DO NOTHING;
 COMMIT;
 
+-- ============================ 0013_sorteio_confirmado.sql ============================
+\echo '== 0013_sorteio_confirmado.sql =='
+BEGIN;
+-- =============================================================================
+-- Sorteio em duas etapas: o admin sorteia (rascunho, só admins veem) e depois
+-- confirma, e aí os participantes passam a ver os times. Cancelar a confirmação
+-- volta o sorteio a rascunho, para refazer ou ajustar à mão.
+-- =============================================================================
+
+alter table sorteios
+  add column confirmado_em timestamptz;
+
+comment on column sorteios.confirmado_em is
+  'Null = rascunho (só admins veem). Preenchido = confirmado: os participantes da organização veem os times.';
+INSERT INTO _migrations (nome) VALUES ('0013_sorteio_confirmado.sql') ON CONFLICT DO NOTHING;
+COMMIT;
+
 \echo ''
 \echo 'Pronto. Schema resenha05 criado. Deploys seguintes: node db/migrate.mjs'

@@ -294,6 +294,8 @@ export function Pelada() {
         </div>
       </section>
 
+      {!admin && <TimesConfirmados peladaId={peladaId} orgId={data.pelada.organizacao_id} />}
+
       {admin && (
         <PainelSorteio
           peladaId={peladaId}
@@ -344,6 +346,115 @@ interface MembroOrg {
   fotoRecortada: boolean;
 }
 
+interface SorteioResp {
+  sorteio: { id: string; confirmado: boolean } | null;
+  times: TimeResultado[];
+}
+
+function BotaoBaixarArte({ peladaId }: { peladaId: string }) {
+  return (
+    <button
+      className="mt-3 inline-flex items-center gap-2 rounded-xl border border-ouro-500/40 bg-gramado-dark px-4 py-2 font-display text-sm font-semibold uppercase tracking-[0.04em] text-ouro-300"
+      onClick={() => baixarPng(`/peladas/${peladaId}/sorteio/arte.png`, 'sorteio-resenha05.png')}
+    >
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <path d="M12 4v11m0 0 4-4m-4 4-4-4M5 19h14" />
+      </svg>
+      Baixar arte do sorteio
+    </button>
+  );
+}
+
+function GradeDeTimes({
+  times,
+  onVerJogador,
+  aoMover,
+  movendo,
+}: {
+  times: TimeResultado[];
+  onVerJogador: (j: { id: string; nome: string | null }) => void;
+  /** Se informado, cada jogador ganha um seletor "Mover…" (rascunho do admin). */
+  aoMover?: (profileId: string, timeNumero: number) => void;
+  movendo?: boolean;
+}) {
+  return (
+    <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
+      {times.map((t) => (
+        <div key={t.numero} className="overflow-hidden rounded-xl border border-tinta-line/70">
+          <div className="flex items-center justify-between bg-gramado-dark px-3 py-2 text-white">
+            <span className="font-display text-sm font-bold uppercase tracking-[0.05em]">Time {t.numero}</span>
+            <Estrelas n={t.totalEstrelas / Math.max(1, t.jogadores.length)} />
+          </div>
+          <ul className="divide-y divide-tinta-line/50 bg-gramado-raised text-sm">
+            {t.jogadores.map((j) => (
+              <li key={j.profileId} className="flex items-center justify-between gap-2 px-3 py-1.5">
+                <button
+                  type="button"
+                  className="min-w-0 truncate text-left text-tinta underline-offset-2 hover:underline"
+                  onClick={() => onVerJogador({ id: j.profileId, nome: j.nome })}
+                >
+                  {j.nome ?? 'Jogador'}
+                </button>
+                <span className="flex shrink-0 items-center gap-2">
+                  <Estrelas n={j.estrelas} />
+                  {aoMover && (
+                    <select
+                      aria-label={`Mover ${j.nome ?? 'jogador'} para outro time`}
+                      value=""
+                      disabled={movendo}
+                      onChange={(e) => {
+                        if (e.target.value) aoMover(j.profileId, Number(e.target.value));
+                      }}
+                      className="rounded-md border border-tinta-line bg-white px-1 py-0.5 text-xs text-tinta-soft disabled:opacity-50"
+                    >
+                      <option value="">Mover…</option>
+                      {times
+                        .filter((o) => o.numero !== t.numero)
+                        .map((o) => (
+                          <option key={o.numero} value={o.numero}>
+                            Time {o.numero}
+                          </option>
+                        ))}
+                    </select>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** O que os participantes veem: só aparece depois que o admin confirma o sorteio. */
+function TimesConfirmados({ peladaId, orgId }: { peladaId: string; orgId: string }) {
+  const [verCard, setVerCard] = useState<{ id: string; nome: string | null } | null>(null);
+  const { data } = useQuery({
+    queryKey: ['sorteio', peladaId],
+    queryFn: () => api<SorteioResp>(`/peladas/${peladaId}/sorteio`),
+    refetchInterval: 8000,
+  });
+  if (!data?.sorteio || data.times.length === 0) return null;
+
+  return (
+    <Card as="section">
+      <Eyebrow>Times do dia</Eyebrow>
+      <p className="-mt-1 text-sm text-tinta-soft">Sorteio confirmado pelo organizador.</p>
+      <BotaoBaixarArte peladaId={peladaId} />
+      <GradeDeTimes times={data.times} onVerJogador={setVerCard} />
+      {verCard && (
+        <CartinhaModal
+          profileId={verCard.id}
+          orgId={orgId}
+          nome={verCard.nome}
+          onFechar={() => setVerCard(null)}
+        />
+      )}
+    </Card>
+  );
+}
+
 interface TimeResultado {
   numero: number;
   totalEstrelas: number;
@@ -388,7 +499,7 @@ function PainelSorteio({
 
   const atual = useQuery({
     queryKey: ['sorteio', peladaId],
-    queryFn: () => api<{ times: TimeResultado[] }>(`/peladas/${peladaId}/sorteio`),
+    queryFn: () => api<SorteioResp>(`/peladas/${peladaId}/sorteio`),
   });
   const sortear = useMutation({
     mutationFn: () =>
@@ -403,7 +514,31 @@ function PainelSorteio({
     onError: (e) => setErro(e instanceof ApiError ? e.message : 'Erro no sorteio.'),
   });
 
-  const times = sortear.data?.times ?? atual.data?.times ?? [];
+  const times = atual.data?.times ?? [];
+  const confirmado = atual.data?.sorteio?.confirmado ?? false;
+  const totais = times.map((t) => t.totalEstrelas);
+  const amplitude = totais.length > 1 ? Math.max(...totais) - Math.min(...totais) : 0;
+
+  const aposAcao = {
+    onSuccess: () => {
+      setErro(null);
+      qc.invalidateQueries({ queryKey: ['sorteio', peladaId] });
+    },
+    onError: (e: unknown) => setErro(e instanceof ApiError ? e.message : 'Não foi possível concluir.'),
+  };
+  const confirmar = useMutation({
+    mutationFn: () => api(`/peladas/${peladaId}/sorteio/confirmar`, { method: 'POST' }),
+    ...aposAcao,
+  });
+  const cancelarConfirmacao = useMutation({
+    mutationFn: () => api(`/peladas/${peladaId}/sorteio/cancelar-confirmacao`, { method: 'POST' }),
+    ...aposAcao,
+  });
+  const mover = useMutation({
+    mutationFn: (v: { profileId: string; timeNumero: number }) =>
+      api(`/peladas/${peladaId}/sorteio/mover`, { method: 'POST', json: v }),
+    ...aposAcao,
+  });
 
   return (
     <Card as="section">
@@ -453,7 +588,7 @@ function PainelSorteio({
           }}
           className="placar-num w-20 rounded-lg border border-tinta-line bg-white px-2 py-1.5 text-center text-base"
         />
-        <Button onClick={() => sortear.mutate()} disabled={sortear.isPending || !valido}>
+        <Button onClick={() => sortear.mutate()} disabled={sortear.isPending || !valido || confirmado}>
           {sortear.isPending ? <Spinner /> : times.length ? 'Re-sortear' : 'Sortear'}
         </Button>
       </div>
@@ -464,48 +599,50 @@ function PainelSorteio({
         </p>
       )}
 
-      {sortear.data && (
+      {times.length > 1 && (
         <p className="mt-2 text-xs text-tinta-faint">
-          Diferença entre o time mais forte e o mais fraco: {sortear.data.amplitudeEstrelas} estrela(s).
+          Diferença entre o time mais forte e o mais fraco: {amplitude} estrela(s).
         </p>
       )}
 
       {times.length > 0 && (
-        <button
-          className="mt-3 inline-flex items-center gap-2 rounded-xl border border-ouro-500/40 bg-gramado-dark px-4 py-2 font-display text-sm font-semibold uppercase tracking-[0.04em] text-ouro-300"
-          onClick={() => baixarPng(`/peladas/${peladaId}/sorteio/arte.png`, 'sorteio-resenha05.png')}
-        >
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M12 4v11m0 0 4-4m-4 4-4-4M5 19h14" />
-          </svg>
-          Baixar arte do sorteio
-        </button>
+        <div className="mt-3 flex flex-col gap-2">
+          {confirmado ? (
+            <>
+              <Aviso tipo="ok">Sorteio confirmado: os participantes já veem os times.</Aviso>
+              <Button
+                variante="secundario"
+                onClick={() => {
+                  if (!confirm('Cancelar a confirmação? Os participantes deixam de ver os times até você confirmar de novo.')) return;
+                  cancelarConfirmacao.mutate();
+                }}
+                disabled={cancelarConfirmacao.isPending}
+              >
+                {cancelarConfirmacao.isPending ? <Spinner /> : 'Cancelar confirmação'}
+              </Button>
+              <p className="text-xs text-tinta-faint">
+                Para refazer o sorteio ou mover jogadores de time, cancele a confirmação primeiro.
+              </p>
+            </>
+          ) : (
+            <>
+              <Aviso>Rascunho: só os administradores veem estes times. Ajuste se precisar e confirme.</Aviso>
+              <Button onClick={() => confirmar.mutate()} disabled={confirmar.isPending}>
+                {confirmar.isPending ? <Spinner /> : 'Confirmar sorteio'}
+              </Button>
+            </>
+          )}
+        </div>
       )}
 
-      <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
-        {times.map((t) => (
-          <div key={t.numero} className="overflow-hidden rounded-xl border border-tinta-line/70">
-            <div className="flex items-center justify-between bg-gramado-dark px-3 py-2 text-white">
-              <span className="font-display text-sm font-bold uppercase tracking-[0.05em]">Time {t.numero}</span>
-              <Estrelas n={t.totalEstrelas / Math.max(1, t.jogadores.length)} />
-            </div>
-            <ul className="divide-y divide-tinta-line/50 bg-gramado-raised text-sm">
-              {t.jogadores.map((j) => (
-                <li key={j.profileId} className="flex items-center justify-between px-3 py-1.5">
-                  <button
-                    type="button"
-                    className="truncate text-left text-tinta underline-offset-2 hover:underline"
-                    onClick={() => setVerCard({ id: j.profileId, nome: j.nome })}
-                  >
-                    {j.nome ?? 'Jogador'}
-                  </button>
-                  <Estrelas n={j.estrelas} />
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
+      {times.length > 0 && <BotaoBaixarArte peladaId={peladaId} />}
+
+      <GradeDeTimes
+        times={times}
+        onVerJogador={setVerCard}
+        {...(confirmado ? {} : { aoMover: (profileId: string, timeNumero: number) => mover.mutate({ profileId, timeNumero }) })}
+        movendo={mover.isPending}
+      />
 
       {verCard && (
         <CartinhaModal

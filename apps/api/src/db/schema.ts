@@ -108,6 +108,8 @@ export interface SorteiosTable {
   n_times: number;
   criado_em: Generated<Timestamp>;
   criado_por: string | null;
+  /** Null = rascunho (só admins veem); preenchido = confirmado, os participantes veem. */
+  confirmado_em: Timestamp | null;
 }
 
 export interface TimesTable {
