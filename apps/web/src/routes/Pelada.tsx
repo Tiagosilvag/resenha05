@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { peladaExigePagamento, statusNoSorteio } from '@resenha05/shared';
+import { amplitudeEntreTimesCheios, peladaExigePagamento, statusNoSorteio } from '@resenha05/shared';
 import { useAuth } from '../lib/auth';
 import { api, ApiError, baixarPng } from '../lib/api';
 import { Aviso, Button, Card, Chip, Estrelas, Eyebrow, Input, MiniCartinha, Spinner, StatTile } from '../components/ui';
@@ -75,6 +75,25 @@ export function Pelada() {
     onError: (e) => setErro(e instanceof ApiError ? e.message : 'Não foi possível adicionar.'),
   });
 
+  const [avisoLista, setAvisoLista] = useState<string | null>(null);
+  const adicionarTodos = useMutation({
+    mutationFn: () =>
+      api<{ adicionados: number }>(`/peladas/${peladaId}/presencas/todos`, { method: 'POST' }),
+    onSuccess: ({ adicionados }) => {
+      setErro(null);
+      setAvisoLista(
+        adicionados === 0
+          ? 'Todo mundo da organização já estava na lista.'
+          : `${adicionados} jogador(es) adicionado(s) à lista.`,
+      );
+      qc.invalidateQueries({ queryKey: ['pelada', peladaId] });
+    },
+    onError: (e) => {
+      setAvisoLista(null);
+      setErro(e instanceof ApiError ? e.message : 'Não foi possível adicionar todos.');
+    },
+  });
+
   const tirarDaLista = useMutation({
     mutationFn: (profileId: string) =>
       api(`/peladas/${peladaId}/presencas/${profileId}`, { method: 'DELETE' }),
@@ -119,8 +138,9 @@ export function Pelada() {
 
   const q = buscaMembro.trim().toLowerCase();
   const naLista = new Set(data.presencas.map((p) => p.profileId));
-  const foraDaLista = (membros.data ?? [])
-    .filter((m) => !naLista.has(m.profileId) && (m.nome ?? '').toLowerCase().includes(q))
+  const membrosForaDaLista = (membros.data ?? []).filter((m) => !naLista.has(m.profileId));
+  const foraDaLista = membrosForaDaLista
+    .filter((m) => (m.nome ?? '').toLowerCase().includes(q))
     .slice(0, 6);
 
   return (
@@ -170,6 +190,7 @@ export function Pelada() {
             value={buscaMembro}
             onChange={(e) => setBuscaMembro(e.target.value)}
           />
+          {avisoLista && <div className="mt-2"><Aviso tipo="ok">{avisoLista}</Aviso></div>}
           {buscaMembro.trim().length >= 2 && (
             <div className="mt-2 overflow-hidden rounded-xl border border-tinta-line">
               {foraDaLista.length === 0 && (
@@ -192,6 +213,23 @@ export function Pelada() {
                 </button>
               ))}
             </div>
+          )}
+          {membrosForaDaLista.length > 0 && (
+            <Button
+              variante="secundario"
+              className="mt-3 w-full"
+              disabled={adicionarTodos.isPending}
+              onClick={() => {
+                const n = membrosForaDaLista.length;
+                const aviso = exigePagamento
+                  ? ' Eles entram como confirmados e só vão para o sorteio depois de marcados como pagos.'
+                  : '';
+                if (!confirm(`Adicionar à lista os ${n} jogador(es) da organização que ainda não estão nela?${aviso}`)) return;
+                adicionarTodos.mutate();
+              }}
+            >
+              {adicionarTodos.isPending ? <Spinner /> : `Adicionar todos da organização (${membrosForaDaLista.length})`}
+            </Button>
           )}
         </Card>
       )}
@@ -450,6 +488,29 @@ interface TimeResultado {
   jogadores: { profileId: string; nome: string | null; estrelas: number }[];
 }
 
+/** Texto de "como vai ficar" antes de sortear. */
+function previaDoSorteio(modo: 'times' | 'porTime', n: number, elegiveis: number): string {
+  if (modo === 'times') {
+    const times = Math.max(2, Math.min(32, n));
+    const base = Math.floor(elegiveis / times);
+    const maiores = elegiveis % times;
+    if (base === 0) return `Só ${elegiveis} jogador(es) para ${times} times.`;
+    return maiores === 0
+      ? `Vai dar ${times} times de ${base} jogador(es).`
+      : `Vai dar ${times} times: ${maiores} com ${base + 1} jogadores e ${times - maiores} com ${base}.`;
+  }
+  const cheios = Math.floor(elegiveis / n);
+  const sobra = elegiveis % n;
+  if (cheios + (sobra > 0 ? 1 : 0) < 2) {
+    return `Com ${elegiveis} jogador(es) não dá para formar 2 times de ${n}.`;
+  }
+  const cheiosTxt = `${cheios} time(s) de ${n}`;
+  if (sobra === 0) return `Vai dar ${cheiosTxt}.`;
+  return sobra === 1
+    ? `Vai dar ${cheiosTxt} + 1 time com o jogador que sobra.`
+    : `Vai dar ${cheiosTxt} + 1 time com os ${sobra} que sobram.`;
+}
+
 function PainelSorteio({
   peladaId,
   orgId,
@@ -475,12 +536,9 @@ function PainelSorteio({
 
   const digitado = Number(quantidade);
   const valido = quantidade !== '' && Number.isFinite(digitado) && digitado >= 1;
-  const nTimes = !valido
-    ? 0
-    : modo === 'times'
-      ? Math.max(2, Math.min(32, Math.round(digitado)))
-      : Math.max(2, Math.min(32, Math.round(elegiveis / Math.round(digitado)) || 2));
-  const porTime = nTimes > 0 ? Math.round(elegiveis / nTimes) : 0;
+  const inteiro = valido ? Math.round(digitado) : 0;
+  const nTimes = !valido ? 0 : Math.max(2, Math.min(32, inteiro));
+  const previa = !valido || elegiveis === 0 ? null : previaDoSorteio(modo, inteiro, elegiveis);
 
   function trocarModo(novo: 'times' | 'porTime') {
     setModo(novo);
@@ -495,7 +553,7 @@ function PainelSorteio({
     mutationFn: () =>
       api<{ times: TimeResultado[]; amplitudeEstrelas: number }>(`/peladas/${peladaId}/sorteio`, {
         method: 'POST',
-        json: { nTimes },
+        json: modo === 'times' ? { nTimes } : { jogadoresPorTime: inteiro },
       }),
     onSuccess: () => {
       setErro(null);
@@ -506,8 +564,7 @@ function PainelSorteio({
 
   const times = atual.data?.times ?? [];
   const confirmado = atual.data?.sorteio?.confirmado ?? false;
-  const totais = times.map((t) => t.totalEstrelas);
-  const amplitude = totais.length > 1 ? Math.max(...totais) - Math.min(...totais) : 0;
+  const amplitude = amplitudeEntreTimesCheios(times);
 
   const aposAcao = {
     onSuccess: () => {
@@ -583,11 +640,7 @@ function PainelSorteio({
         </Button>
       </div>
 
-      {valido && elegiveis > 0 && (
-        <p className="mt-1.5 text-xs text-tinta-faint">
-          Vai dar {nTimes} time(s) de ~{porTime} jogador(es).
-        </p>
-      )}
+      {previa && <p className="mt-1.5 text-xs text-tinta-faint">{previa}</p>}
 
       {times.length > 1 && (
         <p className="mt-2 text-xs text-tinta-faint">

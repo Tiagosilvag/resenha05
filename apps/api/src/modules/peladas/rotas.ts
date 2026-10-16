@@ -315,6 +315,39 @@ export const rotasPeladas: FastifyPluginAsync = async (app) => {
       return { ok: true };
     });
 
+    // Admin coloca na lista todo mundo da organização que ainda não está nela.
+    // Quem já está (confirmado, pago ou que desistiu) fica como está.
+    r.post('/peladas/:peladaId/presencas/todos', async (req, reply) => {
+      const { peladaId } = req.params as { peladaId: string };
+      const pelada = await orgDaPelada(req, peladaId);
+      exigirAdmin(req, pelada.organizacao_id);
+
+      const membros = await db
+        .selectFrom('organizacao_membros')
+        .select('profile_id')
+        .where('organizacao_id', '=', pelada.organizacao_id)
+        .execute();
+      if (membros.length === 0) {
+        reply.code(201);
+        return { adicionados: 0 };
+      }
+
+      const inseridos = await db
+        .insertInto('presencas')
+        .values(
+          membros.map((m) => ({
+            pelada_id: peladaId,
+            profile_id: m.profile_id,
+            status: 'confirmado' as const,
+          })),
+        )
+        .onConflict((oc) => oc.columns(['pelada_id', 'profile_id']).doNothing())
+        .returning('profile_id')
+        .execute();
+      reply.code(201);
+      return { adicionados: inseridos.length };
+    });
+
     // Admin tira alguém da lista.
     r.delete('/peladas/:peladaId/presencas/:profileId', async (req, reply) => {
       const { peladaId, profileId } = req.params as { peladaId: string; profileId: string };
