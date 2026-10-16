@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { StatusAssinatura } from '@resenha05/shared';
 import { api } from '../../lib/api';
 import { Card, Chip, Input, Spinner } from '../../components/ui';
-import { AdminOrganizacaoDetalhe } from './AdminOrganizacaoDetalhe';
+import { AdminOrganizacaoDetalhe, dataBr } from './AdminOrganizacaoDetalhe';
 
 interface OrganizacaoAdmin {
   id: string;
@@ -11,6 +11,8 @@ interface OrganizacaoAdmin {
   codigo: string;
   statusAssinatura: StatusAssinatura;
   criadoEm: string;
+  pagaPeloMercadoPago: boolean;
+  liberadaManualmenteAte: string | null;
 }
 
 const TOM: Record<StatusAssinatura, 'confirmado' | 'pendente' | 'desistiu'> = {
@@ -60,7 +62,15 @@ export function AdminOrganizacoes() {
             >
               <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold">{o.nome}</p>
-                <p className="text-xs text-tinta-faint">Código {o.codigo}</p>
+                <p className="text-xs text-tinta-faint">
+                  Código {o.codigo}
+                  {!o.pagaPeloMercadoPago && o.liberadaManualmenteAte && (
+                    <>
+                      {' · '}
+                      {o.statusAssinatura === 'ativa' ? 'vence' : 'venceu'} em {dataBr(o.liberadaManualmenteAte)}
+                    </>
+                  )}
+                </p>
               </div>
               <Chip tom={TOM[o.statusAssinatura]}>{ROTULO[o.statusAssinatura]}</Chip>
               <svg

@@ -42,3 +42,50 @@ export function derivarStatusOrganizacao(
 export function podeIniciarCheckout(status: StatusAssinatura): boolean {
   return status !== 'ativa';
 }
+
+// --- Liberação manual (admin da plataforma libera um mês sem passar pelo MP) ---
+
+/** Prefixo do `mp_preapproval_id` das linhas de `assinaturas` criadas à mão. */
+export const PREFIXO_LIBERACAO_MANUAL = 'manual-';
+
+/** Até quantos meses à frente (contando o atual) dá para liberar de uma vez. */
+export const MESES_MAX_ADIANTE = 12;
+
+export function idLiberacaoManual(organizacaoId: string): string {
+  return `${PREFIXO_LIBERACAO_MANUAL}${organizacaoId}`;
+}
+
+export function ehLiberacaoManual(mpPreapprovalId: string): boolean {
+  return mpPreapprovalId.startsWith(PREFIXO_LIBERACAO_MANUAL);
+}
+
+/** Último dia do mês de um período ('YYYY-MM-01') — o dia em que a liberação vence. */
+export function fimDoMes(periodoIso: string): string {
+  const [ano, mes] = periodoIso.slice(0, 10).split('-').map(Number) as [number, number];
+  return new Date(Date.UTC(ano, mes, 0)).toISOString().slice(0, 10);
+}
+
+function mesIndice(periodoIso: string): number {
+  const [ano, mes] = periodoIso.slice(0, 10).split('-').map(Number) as [number, number];
+  return ano * 12 + (mes - 1);
+}
+
+function indiceParaPeriodo(indice: number): string {
+  const ano = Math.floor(indice / 12);
+  const mes = (indice % 12) + 1;
+  return `${ano}-${String(mes).padStart(2, '0')}-01`;
+}
+
+/**
+ * Qual mês o botão "liberar" libera: o mês atual (em Brasília) ou, se a
+ * liberação já cobre o atual, o seguinte a ela. Liberar de novo estende.
+ */
+export function proximoMesALiberar(ultimoPeriodoManual: string | null, agora: Date): string {
+  const emBrasilia = new Date(agora.getTime() - 3 * 60 * 60 * 1000);
+  const atual = emBrasilia.getUTCFullYear() * 12 + emBrasilia.getUTCMonth();
+  const alvo = ultimoPeriodoManual ? Math.max(atual, mesIndice(ultimoPeriodoManual) + 1) : atual;
+  if (alvo - atual >= MESES_MAX_ADIANTE) {
+    throw new Error(`Não dá para liberar mais de ${MESES_MAX_ADIANTE} meses adiante.`);
+  }
+  return indiceParaPeriodo(alvo);
+}

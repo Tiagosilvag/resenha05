@@ -1,6 +1,7 @@
 import { construirApp } from './app.js';
 import { env } from './env.js';
 import { pool } from './db/index.js';
+import { expirarLiberacoesManuais } from './lib/liberacao-manual.js';
 
 const app = await construirApp();
 
@@ -11,6 +12,19 @@ try {
   app.log.error(err);
   process.exit(1);
 }
+
+// Liberações manuais da mensalidade que já passaram do mês voltam a pendente.
+async function varrerLiberacoes() {
+  try {
+    const n = await expirarLiberacoesManuais();
+    if (n > 0) app.log.info(`${n} organização(ões) com liberação manual vencida voltaram a pendente.`);
+  } catch (err) {
+    app.log.error(err, 'Falha ao varrer liberações manuais vencidas');
+  }
+}
+void varrerLiberacoes();
+const varredura = setInterval(varrerLiberacoes, 60 * 60 * 1000);
+varredura.unref();
 
 for (const sinal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(sinal, async () => {

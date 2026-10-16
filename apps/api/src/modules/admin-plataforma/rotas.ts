@@ -1,6 +1,9 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { sql } from 'kysely';
 import {
+  idLiberacaoManual,
+  proximoMesALiberar,
+  fimDoMes,
   cadastrarAdminPlataformaSchema,
   configurarMensalidadeSchema,
   conectarMercadoPagoGeralSchema,
@@ -13,6 +16,18 @@ import { erro } from '../../lib/erros.js';
 import { cifrarTokenOuErro } from '../../lib/cripto.js';
 import { consultarConta } from '../../lib/mercadopago-conta.js';
 import { MercadoPagoErro } from '../../lib/mercadopago-preapproval.js';
+import {
+  expirarLiberacoesManuais,
+  situacaoDasLiberacoes,
+  vencimentoManual,
+} from '../../lib/liberacao-manual.js';
+
+function resumoDaLiberacao(situacao: Parameters<typeof vencimentoManual>[0]) {
+  return {
+    pagaPeloMercadoPago: situacao?.pagaPeloMercadoPago ?? false,
+    liberadaManualmenteAte: vencimentoManual(situacao),
+  };
+}
 
 export const rotasAdminPlataforma: FastifyPluginAsync = async (app) => {
   app.addHook('preHandler', app.autenticar);
@@ -79,7 +94,14 @@ export const rotasAdminPlataforma: FastifyPluginAsync = async (app) => {
       query = query.where('nome', 'ilike', `%${q}%`);
     }
 
-    return query.execute();
+    // Quem só estava ativo por liberação manual e passou do mês deve aparecer vencido.
+    await expirarLiberacoesManuais();
+    const orgs = await query.execute();
+    const situacoes = await situacaoDasLiberacoes(orgs.map((o) => o.id));
+    return orgs.map((o) => ({
+      ...o,
+      ...resumoDaLiberacao(situacoes.get(o.id)),
+    }));
   });
 
   // Detalhe somente leitura de uma organização — qualquer admin de plataforma
@@ -91,6 +113,7 @@ export const rotasAdminPlataforma: FastifyPluginAsync = async (app) => {
       throw erro.naoEncontrado('Organização não encontrada.');
     }
 
+    await expirarLiberacoesManuais();
     const org = await db
       .selectFrom('organizacoes as o')
       .innerJoin('profiles as p', 'p.id', 'o.dono_id')
@@ -149,6 +172,7 @@ export const rotasAdminPlataforma: FastifyPluginAsync = async (app) => {
       nome: org.nome,
       codigo: org.codigo,
       statusAssinatura: org.statusAssinatura,
+      ...resumoDaLiberacao((await situacaoDasLiberacoes([id])).get(id)),
       criadoEm: org.criadoEm,
       dono: { profileId: org.donoId, nome: org.donoNome, telefone: org.donoTelefone },
       totais: {
@@ -160,6 +184,49 @@ export const rotasAdminPlataforma: FastifyPluginAsync = async (app) => {
       mercadoPagoDaOrganizacaoConectado: org.mpAtualizadoEm != null,
       assinaturas,
     };
+  });
+
+  // Admin da plataforma libera um mês da mensalidade sem passar pelo Mercado
+  // Pago (cortesia, pagamento por fora). Liberar de novo estende para o mês
+  // seguinte; vence no último dia do mês liberado.
+  app.post('/admin/organizacoes/:id/liberar-mes', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+      throw erro.naoEncontrado('Organização não encontrada.');
+    }
+    const org = await db.selectFrom('organizacoes').select('id').where('id', '=', id).executeTakeFirst();
+    if (!org) throw erro.naoEncontrado('Organização não encontrada.');
+
+    const situacao = (await situacaoDasLiberacoes([id])).get(id);
+    let periodo: string;
+    try {
+      periodo = proximoMesALiberar(situacao?.ultimoPeriodoManual ?? null, new Date());
+    } catch (e) {
+      throw erro.invalido(e instanceof Error ? e.message : 'Não foi possível liberar.');
+    }
+
+    await db.transaction().execute(async (tx) => {
+      await tx
+        .insertInto('assinaturas')
+        .values({
+          organizacao_id: id,
+          mp_preapproval_id: idLiberacaoManual(id),
+          periodo_referencia: periodo,
+          valor_centavos: 0,
+          status: 'aprovado',
+        })
+        .onConflict((oc) =>
+          oc.columns(['mp_preapproval_id', 'periodo_referencia']).doUpdateSet({
+            status: 'aprovado',
+            atualizado_em: new Date(),
+          }),
+        )
+        .execute();
+      await tx.updateTable('organizacoes').set({ status_assinatura: 'ativa' }).where('id', '=', id).execute();
+    });
+
+    reply.code(201);
+    return { periodoReferencia: periodo, venceEm: fimDoMes(periodo) };
   });
 
   app.get('/admin/configuracoes', async () => {

@@ -1,8 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
-import { formatarTelefone } from '@resenha05/shared';
-import { api } from '../../lib/api';
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { fimDoMes, formatarTelefone, proximoMesALiberar, type StatusAssinatura } from '@resenha05/shared';
+import { api, ApiError } from '../../lib/api';
 import { formatarCentavos } from '../../lib/dinheiro';
-import { Aviso, Chip, Spinner, StatTile } from '../../components/ui';
+import { Aviso, Button, Chip, Spinner, StatTile } from '../../components/ui';
 
 type StatusCiclo = 'pendente' | 'aprovado' | 'atrasado' | 'cancelado';
 
@@ -10,6 +11,9 @@ interface Detalhe {
   id: string;
   nome: string;
   codigo: string;
+  statusAssinatura: StatusAssinatura;
+  pagaPeloMercadoPago: boolean;
+  liberadaManualmenteAte: string | null;
   criadoEm: string;
   dono: { profileId: string; nome: string | null; telefone: string };
   totais: { membros: number; admins: number; peladas: number; torneios: number };
@@ -30,14 +34,43 @@ function mesAno(dataIso: string): string {
   return `${mes}/${ano}`;
 }
 
+/** Mês que o botão vai liberar, ou null se já bateu o limite adiante. */
+function proximoMesDaLiberacao(liberadaAte: string | null): string | null {
+  try {
+    return proximoMesALiberar(liberadaAte ? `${liberadaAte.slice(0, 7)}-01` : null, new Date());
+  } catch {
+    return null;
+  }
+}
+
+/** 'YYYY-MM-DD' → 'DD/MM/AAAA' (sem passar por Date, para o fuso não mudar o dia). */
+export function dataBr(dataIso: string): string {
+  const [ano, mes, dia] = dataIso.slice(0, 10).split('-');
+  return `${dia}/${mes}/${ano}`;
+}
+
 export function AdminOrganizacaoDetalhe({ id }: { id: string }) {
+  const qc = useQueryClient();
+  const [erro, setErro] = useState<string | null>(null);
   const { data, isLoading, isError } = useQuery({
     queryKey: ['admin-organizacao', id],
     queryFn: () => api<Detalhe>(`/admin/organizacoes/${id}`),
   });
 
+  const liberar = useMutation({
+    mutationFn: () => api<{ periodoReferencia: string; venceEm: string }>(`/admin/organizacoes/${id}/liberar-mes`, { method: 'POST' }),
+    onSuccess: () => {
+      setErro(null);
+      qc.invalidateQueries({ queryKey: ['admin-organizacao', id] });
+      qc.invalidateQueries({ queryKey: ['admin-organizacoes'] });
+    },
+    onError: (e) => setErro(e instanceof ApiError ? e.message : 'Não foi possível liberar o mês.'),
+  });
+
   if (isLoading) return <Spinner className="h-5 w-5 text-campo-600" />;
   if (isError || !data) return <Aviso tipo="erro">Não foi possível carregar os detalhes.</Aviso>;
+
+  const proximoMes = proximoMesDaLiberacao(data.liberadaManualmenteAte);
 
   return (
     <div className="flex flex-col gap-3 border-t border-tinta-line/60 pt-3">
@@ -58,6 +91,33 @@ export function AdminOrganizacaoDetalhe({ id }: { id: string }) {
         Criada em {new Date(data.criadoEm).toLocaleDateString('pt-BR')} · Mercado Pago da organização:{' '}
         {data.mercadoPagoDaOrganizacaoConectado ? 'conectado' : 'não conectado'}
       </p>
+
+      <div>
+        <p className="eyebrow mb-1">Mensalidade</p>
+        <p className="text-sm text-tinta-soft">
+          {data.pagaPeloMercadoPago
+            ? 'Paga pelo Mercado Pago (renovação automática).'
+            : data.liberadaManualmenteAte
+              ? `Liberada à mão ${data.statusAssinatura === 'ativa' ? 'até' : '— venceu em'} ${dataBr(data.liberadaManualmenteAte)}.`
+              : data.statusAssinatura === 'ativa'
+                ? 'Ativa, sem vencimento (organização anterior à cobrança).'
+                : 'Sem mensalidade em dia.'}
+        </p>
+        {erro && <div className="mt-2"><Aviso tipo="erro">{erro}</Aviso></div>}
+        {!data.pagaPeloMercadoPago && proximoMes && (
+          <Button
+            variante="secundario"
+            className="mt-2 w-full"
+            disabled={liberar.isPending}
+            onClick={() => {
+              if (!confirm(`Liberar a mensalidade de ${mesAno(proximoMes)} para "${data.nome}"? Vence em ${dataBr(fimDoMes(proximoMes))}.`)) return;
+              liberar.mutate();
+            }}
+          >
+            {liberar.isPending ? <Spinner /> : `Liberar ${mesAno(proximoMes)}`}
+          </Button>
+        )}
+      </div>
 
       <div>
         <p className="eyebrow mb-1">Histórico da mensalidade</p>
