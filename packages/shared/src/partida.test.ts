@@ -7,6 +7,8 @@ import {
   tempoEsgotado,
   instanteDoFimPorTempo,
   sugerirProximaPartida,
+  rankearSubstitutos,
+  filaDeEspera,
   type TimeDaPartida,
 } from './partida.js';
 
@@ -241,5 +243,124 @@ describe('sugerirProximaPartida', () => {
       timeAId: 'A',
       timeBId: 'B',
     });
+  });
+});
+
+describe('rankearSubstitutos', () => {
+  const jg = (id: string, estrelas: number) => ({ profileId: id, estrelas });
+
+  it('com os times equilibrados, entra quem tem as estrelas de quem saiu', () => {
+    const meuTime = [jg('a', 5), jg('b', 3), jg('c', 2), jg('d', 2)]; // 12
+    const adversario = [jg('x', 3), jg('y', 3), jg('z', 3), jg('w', 3)]; // 12
+    const r = rankearSubstitutos({
+      saindo: jg('a', 5),
+      meuTime,
+      adversario,
+      candidatos: [jg('c1', 2), jg('c2', 5), jg('c3', 4)],
+    });
+    expect(r[0]!.profileId).toBe('c2');
+    expect(r[0]!.diferenca).toBe(0);
+  });
+
+  it('com o time mais forte que o adversário, o substituto mais fraco equilibra', () => {
+    const meuTime = [jg('a', 5), jg('b', 4), jg('c', 4), jg('d', 3)]; // 16
+    const adversario = [jg('x', 3), jg('y', 3), jg('z', 3), jg('w', 3)]; // 12
+    const r = rankearSubstitutos({
+      saindo: jg('a', 5),
+      meuTime,
+      adversario,
+      candidatos: [jg('c1', 1), jg('c2', 5), jg('c3', 3)],
+    });
+    // sem o 5: 11; com 1 => 12 (exato)
+    expect(r[0]!.profileId).toBe('c1');
+  });
+
+  it('o time mais fraco puxa o substituto mais forte', () => {
+    const meuTime = [jg('a', 2), jg('b', 2), jg('c', 2), jg('d', 2)]; // 8
+    const adversario = [jg('x', 4), jg('y', 4), jg('z', 4), jg('w', 4)]; // 16
+    const r = rankearSubstitutos({
+      saindo: jg('a', 2),
+      meuTime,
+      adversario,
+      candidatos: [jg('c1', 1), jg('c2', 5), jg('c3', 3)],
+    });
+    expect(r.map((x) => x.profileId)).toEqual(['c2', 'c3', 'c1']);
+  });
+
+  it('no empate de equilíbrio, vence quem tem estrelas mais parecidas com as de quem saiu', () => {
+    const meuTime = [jg('a', 3), jg('b', 3)];
+    const adversario = [jg('x', 3), jg('y', 3)];
+    // sem 'a': média do time com c = (3+e)/2; e=2 → 2.5 (dif .5); e=4 → 3.5 (dif .5)
+    const r = rankearSubstitutos({
+      saindo: jg('a', 3),
+      meuTime,
+      adversario,
+      candidatos: [jg('forte', 5), jg('fraco', 1), jg('igual', 3)],
+    });
+    expect(r[0]!.profileId).toBe('igual');
+  });
+
+  it('funciona com times de tamanhos diferentes (compara médias)', () => {
+    const meuTime = [jg('a', 3)]; // time incompleto
+    const adversario = [jg('x', 4), jg('y', 4), jg('z', 4), jg('w', 4)];
+    const r = rankearSubstitutos({
+      saindo: jg('a', 3),
+      meuTime,
+      adversario,
+      candidatos: [jg('c1', 2), jg('c2', 4)],
+    });
+    expect(r[0]!.profileId).toBe('c2');
+    expect(r[0]!.mediaDoTime).toBe(4);
+  });
+
+  it('sem candidatos devolve lista vazia', () => {
+    expect(
+      rankearSubstitutos({ saindo: jg('a', 3), meuTime: [jg('a', 3)], adversario: [jg('x', 3)], candidatos: [] }),
+    ).toEqual([]);
+  });
+
+  it('é determinístico', () => {
+    const e = {
+      saindo: jg('a', 3),
+      meuTime: [jg('a', 3), jg('b', 3)],
+      adversario: [jg('x', 3), jg('y', 3)],
+      candidatos: [jg('c1', 2), jg('c2', 4), jg('c3', 2)],
+    };
+    expect(rankearSubstitutos(e)).toEqual(rankearSubstitutos(e));
+  });
+});
+
+describe('filaDeEspera', () => {
+  const t = (id: string, numero: number, jogadores: number) => ({ id, numero, jogadores });
+
+  it('só os times fora da partida, na ordem de número se ninguém jogou', () => {
+    const times = [t('A', 1, 5), t('B', 2, 5), t('C', 3, 5), t('D', 4, 5)];
+    expect(filaDeEspera(times, [], ['A', 'B'])).toEqual(['C', 'D']);
+  });
+
+  it('quem esperou mais entra antes; quem acabou de jogar vai para o fim', () => {
+    const times = [t('A', 1, 5), t('B', 2, 5), t('C', 3, 5), t('D', 4, 5)];
+    const jogadas = [
+      { timeAId: 'A', timeBId: 'B' },
+      { timeAId: 'A', timeBId: 'C' },
+    ];
+    // em jogo A x D; B jogou na 1ª, C na 2ª
+    expect(filaDeEspera(times, jogadas, ['A', 'D'])).toEqual(['B', 'C']);
+  });
+
+  it('time incompleto fica atrás dos completos', () => {
+    const times = [t('A', 1, 4), t('B', 2, 4), t('C', 3, 1), t('D', 4, 4)];
+    expect(filaDeEspera(times, [], ['A', 'B'])).toEqual(['D', 'C']);
+  });
+
+  it('com um só time esperando, ele é o próximo e o último', () => {
+    const times = [t('A', 1, 4), t('B', 2, 4), t('C', 3, 1)];
+    const fila = filaDeEspera(times, [], ['A', 'B']);
+    expect(fila).toEqual(['C']);
+    expect(fila[0]).toBe(fila[fila.length - 1]);
+  });
+
+  it('sem ninguém esperando, fila vazia', () => {
+    expect(filaDeEspera([t('A', 1, 5), t('B', 2, 5)], [], ['A', 'B'])).toEqual([]);
   });
 });

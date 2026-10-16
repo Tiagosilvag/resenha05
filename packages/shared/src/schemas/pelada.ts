@@ -103,3 +103,12 @@ export const encerrarPartidaSchema = z.object({
 export const concluirPartidaSchema = z.object({
   perdedorTimeId: z.string().uuid().nullable(),
 });
+
+/** Troca durante a partida; `voltaAJogar` false = quem saiu não joga mais hoje (lesão). */
+export const substituirJogadorSchema = z
+  .object({
+    saiProfileId: z.string().uuid(),
+    entraProfileId: z.string().uuid(),
+    voltaAJogar: z.boolean().default(true),
+  })
+  .refine((v) => v.saiProfileId !== v.entraProfileId, { message: 'Escolha dois jogadores diferentes.' });

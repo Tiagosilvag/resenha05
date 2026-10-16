@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { rankearSubstitutos } from '@resenha05/shared';
 import { api, ApiError } from '../lib/api';
 import { Aviso, Button, Card, Chip, Eyebrow, Input, MiniCartinha, Select, Spinner } from '../components/ui';
 
@@ -51,11 +52,21 @@ interface Partida {
     totalReferencia: number;
     diferenca: number;
   } | null;
-  jogadores: { timeId: string; profileId: string; nome: string | null; estrelas: number }[];
+  jogadores: { timeId: string; profileId: string; nome: string | null; estrelas: number; ativo: boolean }[];
+  substituicoes: {
+    id: string;
+    timeId: string;
+    saiu: string | null;
+    entrou: string | null;
+    destino: string | null;
+    criadoEm: string;
+  }[];
   gols: Gol[];
 }
 interface Resp {
   souAdmin: boolean;
+  /** Times esperando, do próximo a jogar ao último (só com partida aberta). */
+  fila: string[];
   pelada: { data: string; local: string | null };
   regras: { duracaoMin: number | null; golsLimite: number | null };
   sorteio: { confirmado: boolean } | null;
@@ -178,6 +189,8 @@ export function PartidasPelada() {
           {aberta ? (
             <PartidaAtual
               partida={aberta}
+              times={times}
+              fila={data.fila}
               decorrido={decorrido}
               souAdmin={souAdmin}
               ocupado={acao.isPending || concluir.isPending}
@@ -386,6 +399,8 @@ function NovaPartida({
 
 function PartidaAtual({
   partida: p,
+  times,
+  fila,
   decorrido,
   souAdmin,
   ocupado,
@@ -393,6 +408,8 @@ function PartidaAtual({
   onConcluir,
 }: {
   partida: Partida;
+  times: TimeAtual[];
+  fila: string[];
   decorrido: number;
   souAdmin: boolean;
   ocupado: boolean;
@@ -400,12 +417,15 @@ function PartidaAtual({
   onConcluir: (perdedorTimeId: string | null) => void;
 }) {
   const [golDe, setGolDe] = useState<'a' | 'b' | null>(null);
+  const [saindo, setSaindo] = useState<string | null>(null);
   const encerrada = p.status === 'encerrado';
   const podeMarcar = souAdmin && (p.status === 'em_andamento' || p.status === 'pausado');
   const relogio = p.duracaoMin != null ? p.duracaoMin * 60 - decorrido : decorrido;
   const estado = ESTADO[p.status];
 
-  const doTime = (timeId: string) => p.jogadores.filter((j) => j.timeId === timeId);
+  // Só quem está em quadra; quem saiu numa substituição fica só no histórico.
+  const doTime = (timeId: string) => p.jogadores.filter((j) => j.timeId === timeId && j.ativo);
+  const podeTrocar = souAdmin && !encerrada;
   const golsDe = (profileId: string) => p.gols.filter((g) => g.profileId === profileId).length;
 
   return (
@@ -511,17 +531,46 @@ function PartidaAtual({
               {doTime(time.id).map((j) => (
                 <li key={j.profileId} className="flex items-center justify-between gap-1">
                   <span className="truncate">{j.nome ?? 'Jogador'}</span>
-                  {golsDe(j.profileId) > 0 && (
-                    <span className="shrink-0 rounded-full bg-campo-100 px-1.5 text-[0.7rem] font-bold text-campo-800">
-                      ⚽ {golsDe(j.profileId)}
-                    </span>
-                  )}
+                  <span className="flex shrink-0 items-center gap-1">
+                    {golsDe(j.profileId) > 0 && (
+                      <span className="rounded-full bg-campo-100 px-1.5 text-[0.7rem] font-bold text-campo-800">
+                        ⚽ {golsDe(j.profileId)}
+                      </span>
+                    )}
+                    {podeTrocar && (
+                      <button
+                        type="button"
+                        aria-label={`Substituir ${j.nome ?? 'jogador'}`}
+                        disabled={ocupado}
+                        onClick={() => setSaindo(j.profileId)}
+                        className="grid h-6 w-6 place-items-center rounded-full text-campo-700 hover:bg-campo-100"
+                      >
+                        ⇄
+                      </button>
+                    )}
+                  </span>
                 </li>
               ))}
             </ul>
           </div>
         ))}
       </div>
+
+      {p.substituicoes.length > 0 && (
+        <div>
+          <p className="eyebrow mb-1">Substituições</p>
+          <ul className="flex flex-col gap-1 text-sm text-tinta-soft">
+            {p.substituicoes.map((x) => (
+              <li key={x.id}>
+                <span className="text-xs text-tinta-faint">{hora(x.criadoEm)}</span> ⇄ saiu{' '}
+                <span className="font-medium text-tinta">{x.saiu ?? 'Jogador'}</span>, entrou{' '}
+                <span className="font-medium text-tinta">{x.entrou ?? 'Jogador'}</span>
+                {x.destino ? ` · ${x.saiu ?? 'ele'} foi para o ${x.destino}` : ' · não joga mais hoje'}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* gols marcados */}
       {p.gols.length > 0 && (
@@ -557,6 +606,25 @@ function PartidaAtual({
       )}
 
       {encerrada && <FimDeJogo partida={p} souAdmin={souAdmin} ocupado={ocupado} onConcluir={onConcluir} />}
+
+      {saindo && (
+        <SubstituirModal
+          partida={p}
+          saindoId={saindo}
+          times={times}
+          fila={fila}
+          ocupado={ocupado}
+          onFechar={() => setSaindo(null)}
+          onConfirmar={(entraProfileId, voltaAJogar) => {
+            onAcao(`/partidas/${p.id}/substituicoes`, 'POST', {
+              saiProfileId: saindo,
+              entraProfileId,
+              voltaAJogar,
+            });
+            setSaindo(null);
+          }}
+        />
+      )}
 
       {golDe && (
         <MarcarGol
@@ -711,6 +779,150 @@ function MarcarGol({
         <div className="border-t border-tinta-line/60 p-3">
           <Button className="w-full" disabled={!escolhido || ocupado} onClick={() => escolhido && onConfirmar(escolhido)}>
             Confirmar gol
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SubstituirModal({
+  partida: p,
+  saindoId,
+  times,
+  fila,
+  ocupado,
+  onFechar,
+  onConfirmar,
+}: {
+  partida: Partida;
+  saindoId: string;
+  times: TimeAtual[];
+  fila: string[];
+  ocupado: boolean;
+  onFechar: () => void;
+  onConfirmar: (entraProfileId: string, voltaAJogar: boolean) => void;
+}) {
+  const emQuadra = p.jogadores.filter((j) => j.ativo);
+  const saindo = emQuadra.find((j) => j.profileId === saindoId);
+  const meuTime = emQuadra.filter((j) => j.timeId === saindo?.timeId);
+  const adversario = emQuadra.filter((j) => j.timeId !== saindo?.timeId);
+  const meuTimeNome = saindo?.timeId === p.timeA.id ? p.timeA.nome : p.timeB.nome;
+
+  // Quem espera, na ordem da fila; dentro de cada time, do melhor encaixe ao pior.
+  const grupos = useMemo(() => {
+    if (!saindo) return [];
+    return fila
+      .map((id) => times.find((t) => t.id === id))
+      .filter((t): t is TimeAtual => t !== undefined && t.jogadores.length > 0)
+      .map((t) => ({
+        time: t,
+        candidatos: rankearSubstitutos({ saindo, meuTime, adversario, candidatos: t.jogadores }),
+      }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saindo?.profileId, fila.join(), times, p.jogadores]);
+
+  const sugerido = grupos[0]?.candidatos[0]?.profileId ?? null;
+  const [escolhido, setEscolhido] = useState<string | null>(sugerido);
+  const [volta, setVolta] = useState(true);
+  useEffect(() => setEscolhido(sugerido), [sugerido]);
+  useEffect(() => {
+    const aoTeclar = (e: KeyboardEvent) => e.key === 'Escape' && onFechar();
+    window.addEventListener('keydown', aoTeclar);
+    return () => window.removeEventListener('keydown', aoTeclar);
+  }, [onFechar]);
+
+  const ultimo = grupos[grupos.length - 1]?.time ?? null;
+  const mediaAdversario = adversario.length ? adversario.reduce((s, j) => s + j.estrelas, 0) / adversario.length : 0;
+  if (!saindo) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 sm:items-center" onClick={onFechar}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Substituir ${saindo.nome ?? 'jogador'}`}
+        className="flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-gramado-raised shadow-pop"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between bg-gramado-dark px-4 py-3">
+          <h2 className="font-display text-base font-bold uppercase tracking-[0.05em] text-white">
+            Sai {saindo.nome ?? 'jogador'} ({saindo.estrelas}★)
+          </h2>
+          <button type="button" aria-label="Fechar" onClick={onFechar} className="text-white/80 hover:text-white">
+            ✕
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-4 overflow-y-auto p-4">
+          {grupos.length === 0 ? (
+            <Aviso>Não há jogadores esperando para entrar.</Aviso>
+          ) : (
+            <>
+              <p className="text-sm text-tinta-soft">
+                Quem entra pelo {meuTimeNome}. O primeiro é o que melhor equilibra contra o adversário.
+              </p>
+              {grupos.map((g, gi) => (
+                <section key={g.time.id}>
+                  <p className="eyebrow mb-1.5">{gi === 0 ? `Próximo a jogar: ${g.time.nome}` : g.time.nome}</p>
+                  <ul className="flex flex-col gap-1.5">
+                    {g.candidatos.map((c, ci) => (
+                      <li key={c.profileId}>
+                        <button
+                          type="button"
+                          aria-pressed={escolhido === c.profileId}
+                          onClick={() => setEscolhido(c.profileId)}
+                          className={`flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left text-sm transition-colors ${
+                            escolhido === c.profileId ? 'border-campo-500 bg-campo-100' : 'border-tinta-line hover:bg-campo-50'
+                          }`}
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate font-medium">
+                              {g.time.jogadores.find((j) => j.profileId === c.profileId)?.nome ?? 'Jogador'}
+                              {gi === 0 && ci === 0 && (
+                                <span className="ml-2 rounded-full bg-grama-100 px-1.5 py-0.5 text-[0.65rem] font-bold uppercase text-grama-800">
+                                  melhor encaixe
+                                </span>
+                              )}
+                            </span>
+                            <span className="text-xs text-tinta-faint">
+                              {c.estrelas}★ · time fica com média {c.mediaDoTime.toFixed(1)} contra {mediaAdversario.toFixed(1)}
+                            </span>
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={volta}
+                  onChange={(e) => setVolta(e.target.checked)}
+                  className="mt-0.5 accent-campo-600"
+                />
+                <span>
+                  {saindo.nome ?? 'Ele'} ainda vai jogar hoje
+                  <span className="block text-xs text-tinta-faint">
+                    {volta
+                      ? `Vai para o último time da fila (${ultimo?.nome ?? 'fim da fila'}).`
+                      : 'Sai dos times e não joga mais hoje (ex.: lesão).'}
+                  </span>
+                </span>
+              </label>
+            </>
+          )}
+        </div>
+
+        <div className="border-t border-tinta-line/60 p-3">
+          <Button
+            className="w-full"
+            disabled={!escolhido || ocupado || grupos.length === 0}
+            onClick={() => escolhido && onConfirmar(escolhido, volta)}
+          >
+            Confirmar troca
           </Button>
         </div>
       </div>

@@ -191,6 +191,21 @@ export interface PartidaJogadoresTable {
   profile_id: string;
   time_id: string;
   estrelas: number;
+  /** Preenchido para quem entrou depois do início (substituição). */
+  entrou_em: Timestamp | null;
+  /** Preenchido para quem já saiu da partida. */
+  saiu_em: Timestamp | null;
+}
+
+export interface PartidaSubstituicoesTable {
+  id: Generated<string>;
+  jogo_id: string;
+  time_id: string;
+  saiu_profile_id: string;
+  entrou_profile_id: string;
+  destino_time_id: string | null;
+  criado_em: Generated<Timestamp>;
+  criado_por: string | null;
 }
 
 export interface SumulaEventosTable {
@@ -271,4 +286,5 @@ export interface Database {
   plataforma_config: PlataformaConfigTable;
   assinaturas: AssinaturasTable;
   partida_jogadores: PartidaJogadoresTable;
+  partida_substituicoes: PartidaSubstituicoesTable;
 }

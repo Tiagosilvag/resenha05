@@ -6,11 +6,13 @@ import {
   criarPartidaSchema,
   decorridoSegundos,
   encerrarPartidaSchema,
+  filaDeEspera,
   golPartidaSchema,
   instanteDoFimPorTempo,
   redistribuirPerdedor,
   regrasPartidaSchema,
   resultadoDaPartida,
+  substituirJogadorSchema,
   sugerirProximaPartida,
   tempoEsgotado,
 } from '@resenha05/shared';
@@ -197,11 +199,18 @@ async function montarPartidas(peladaId: string, agora: Date) {
   if (jogos.length === 0) return [];
   const ids = jogos.map((j) => j.id);
 
-  const [jogadores, gols, times] = await Promise.all([
+  const [jogadores, gols, times, substituicoes] = await Promise.all([
     db
       .selectFrom('partida_jogadores as pj')
       .innerJoin('profiles as p', 'p.id', 'pj.profile_id')
-      .select(['pj.jogo_id as jogoId', 'pj.time_id as timeId', 'p.id as profileId', 'p.nome as nome', 'pj.estrelas as estrelas'])
+      .select([
+        'pj.jogo_id as jogoId',
+        'pj.time_id as timeId',
+        'p.id as profileId',
+        'p.nome as nome',
+        'pj.estrelas as estrelas',
+        'pj.saiu_em as saiuEm',
+      ])
       .where('pj.jogo_id', 'in', ids)
       .orderBy('pj.estrelas', 'desc')
       .orderBy('p.nome')
@@ -222,16 +231,38 @@ async function montarPartidas(peladaId: string, agora: Date) {
       .where('se.removido_em', 'is', null)
       .orderBy('se.criado_em')
       .execute(),
+    // Todos os times dos sorteios envolvidos (os de destino das trocas também).
     db
       .selectFrom('times')
       .select(['id', 'numero', 'nome'])
-      .where(
-        'id',
-        'in',
-        [...new Set(jogos.flatMap((j) => [j.time_a_sorteio_id, j.time_b_sorteio_id, j.vencedor_time_id, j.perdedor_time_id]))].filter(
-          (x): x is string => Boolean(x),
-        ),
+      .where('sorteio_id', 'in', (eb) =>
+        eb
+          .selectFrom('times as t2')
+          .select('t2.sorteio_id')
+          .where(
+            't2.id',
+            'in',
+            [...new Set(jogos.flatMap((j) => [j.time_a_sorteio_id, j.time_b_sorteio_id]))].filter(
+              (x): x is string => Boolean(x),
+            ),
+          ),
       )
+      .execute(),
+    db
+      .selectFrom('partida_substituicoes as sb')
+      .innerJoin('profiles as ps', 'ps.id', 'sb.saiu_profile_id')
+      .innerJoin('profiles as pe', 'pe.id', 'sb.entrou_profile_id')
+      .select([
+        'sb.id as id',
+        'sb.jogo_id as jogoId',
+        'sb.time_id as timeId',
+        'sb.destino_time_id as destinoTimeId',
+        'sb.criado_em as criadoEm',
+        'ps.nome as saiu',
+        'pe.nome as entrou',
+      ])
+      .where('sb.jogo_id', 'in', ids)
+      .orderBy('sb.criado_em')
       .execute(),
   ]);
   const rotulos = new Map(times.map((t) => [t.id, rotuloDoTime(t)]));
@@ -263,7 +294,10 @@ async function montarPartidas(peladaId: string, agora: Date) {
       redistribuicao: j.redistribuicao,
       jogadores: jogadores
         .filter((x) => x.jogoId === j.id)
-        .map(({ jogoId: _j, ...x }) => x),
+        .map(({ jogoId: _j, saiuEm, ...x }) => ({ ...x, ativo: saiuEm === null })),
+      substituicoes: substituicoes
+        .filter((x) => x.jogoId === j.id)
+        .map(({ jogoId: _j, ...x }) => ({ ...x, destino: rotulos.get(x.destinoTimeId ?? '') ?? null })),
       gols: meusGols.map((g) => ({
         id: g.id,
         timeId: g.timeId,
@@ -341,9 +375,20 @@ export const rotasPartidas: FastifyPluginAsync = async (app) => {
       })),
     );
 
+    // Quem espera, do próximo ao último: de lá saem os substitutos e para o fim vai quem sai.
+    const emAberto = partidas.find((p) => !p.concluida);
+    const fila = emAberto
+      ? filaDeEspera(
+          times.map((t) => ({ id: t.id, numero: t.numero, jogadores: t.jogadores.length })),
+          concluidas.map((p) => ({ timeAId: p.timeA.id!, timeBId: p.timeB.id! })),
+          [emAberto.timeA.id, emAberto.timeB.id].filter((x): x is string => Boolean(x)),
+        )
+      : [];
+
     return {
       souAdmin,
       agora: agora.toISOString(),
+      fila,
       pelada: { data: pelada.data, local: pelada.local },
       regras: { duracaoMin: pelada.partida_duracao_min, golsLimite: pelada.partida_gols_limite },
       sorteio: sorteio ? { confirmado: sorteio.confirmado } : null,
@@ -529,8 +574,9 @@ export const rotasPartidas: FastifyPluginAsync = async (app) => {
         .where('jogo_id', '=', jogo.id)
         .where('time_id', '=', d.timeId)
         .where('profile_id', '=', d.profileId)
+        .where('saiu_em', 'is', null)
         .executeTakeFirst();
-      if (!joga) throw erro.invalido('Esse jogador não é do time que marcou.');
+      if (!joga) throw erro.invalido('Esse jogador não está em quadra pelo time que marcou.');
 
       await tx
         .insertInto('sumula_eventos')
@@ -597,6 +643,121 @@ export const rotasPartidas: FastifyPluginAsync = async (app) => {
       }
     });
     reply.code(204);
+  });
+
+  // Troca no meio da partida (cansaço, lesão): sai um, entra alguém que esperava.
+  // Quem saiu vai para o último time da fila (ou, se não volta a jogar, deixa os times).
+  app.post('/partidas/:jogoId/substituicoes', async (req, reply) => {
+    const { jogoId } = req.params as { jogoId: string };
+    const { orgId, peladaId } = await orgDaPartida(jogoId);
+    exigirAdmin(req, orgId);
+    const d = validar(substituirJogadorSchema, req.body);
+
+    const resultado = await comPartida(jogoId, async (tx, jogo) => {
+      if (jogo.status === 'encerrado') throw erro.conflito('A partida já terminou.');
+
+      const saindo = await tx
+        .selectFrom('partida_jogadores')
+        .select(['time_id', 'estrelas'])
+        .where('jogo_id', '=', jogo.id)
+        .where('profile_id', '=', d.saiProfileId)
+        .where('saiu_em', 'is', null)
+        .executeTakeFirst();
+      if (!saindo) throw erro.invalido('Esse jogador não está em quadra nesta partida.');
+
+      const sorteio = await tx
+        .selectFrom('times')
+        .select('sorteio_id')
+        .where('id', '=', saindo.time_id)
+        .executeTakeFirstOrThrow();
+      const times = await timesDoSorteio(sorteio.sorteio_id, tx);
+      const emJogo = [jogo.time_a_sorteio_id, jogo.time_b_sorteio_id].filter((x): x is string => Boolean(x));
+
+      const timeDeOrigem = times.find((t) => t.jogadores.some((j) => j.profileId === d.entraProfileId));
+      if (!timeDeOrigem || emJogo.includes(timeDeOrigem.id)) {
+        throw erro.invalido('Quem entra precisa estar em um time que está esperando.');
+      }
+      const estrelasDoQueEntra = timeDeOrigem.jogadores.find((j) => j.profileId === d.entraProfileId)!.estrelas;
+
+      const anteriores = await tx
+        .selectFrom('jogos')
+        .select(['time_a_sorteio_id', 'time_b_sorteio_id'])
+        .where('pelada_id', '=', peladaId)
+        .where('concluido_em', 'is not', null)
+        .orderBy('criado_em')
+        .execute();
+      const fila = filaDeEspera(
+        times.map((t) => ({ id: t.id, numero: t.numero, jogadores: t.jogadores.length })),
+        anteriores
+          .filter((a) => a.time_a_sorteio_id && a.time_b_sorteio_id)
+          .map((a) => ({ timeAId: a.time_a_sorteio_id!, timeBId: a.time_b_sorteio_id! })),
+        emJogo,
+      );
+      const destino = d.voltaAJogar ? (fila[fila.length - 1] ?? null) : null;
+
+      // Quem entra assume o lugar; quem sai vai para o fim da fila (ou deixa os times).
+      await tx
+        .updateTable('time_jogadores')
+        .set({ time_id: saindo.time_id })
+        .where('time_id', '=', timeDeOrigem.id)
+        .where('profile_id', '=', d.entraProfileId)
+        .execute();
+      if (destino) {
+        await tx
+          .updateTable('time_jogadores')
+          .set({ time_id: destino })
+          .where('time_id', '=', saindo.time_id)
+          .where('profile_id', '=', d.saiProfileId)
+          .execute();
+      } else {
+        await tx
+          .deleteFrom('time_jogadores')
+          .where('time_id', '=', saindo.time_id)
+          .where('profile_id', '=', d.saiProfileId)
+          .execute();
+      }
+
+      const agora = new Date();
+      await tx
+        .updateTable('partida_jogadores')
+        .set({ saiu_em: agora })
+        .where('jogo_id', '=', jogo.id)
+        .where('profile_id', '=', d.saiProfileId)
+        .execute();
+      await tx
+        .insertInto('partida_jogadores')
+        .values({
+          jogo_id: jogo.id,
+          profile_id: d.entraProfileId,
+          time_id: saindo.time_id,
+          estrelas: estrelasDoQueEntra,
+          entrou_em: agora,
+          saiu_em: null,
+        })
+        .onConflict((oc) =>
+          oc.columns(['jogo_id', 'profile_id']).doUpdateSet({
+            time_id: saindo.time_id,
+            estrelas: estrelasDoQueEntra,
+            entrou_em: agora,
+            saiu_em: null,
+          }),
+        )
+        .execute();
+      await tx
+        .insertInto('partida_substituicoes')
+        .values({
+          jogo_id: jogo.id,
+          time_id: saindo.time_id,
+          saiu_profile_id: d.saiProfileId,
+          entrou_profile_id: d.entraProfileId,
+          destino_time_id: destino,
+          criado_por: req.usuario.id,
+        })
+        .execute();
+      return { destinoTimeId: destino };
+    });
+    reply.code(201);
+    return resultado;
   });
 
   // Fecha o ciclo da partida: o responsável diz quem perdeu e, se for o caso, o

@@ -215,3 +215,76 @@ export function sugerirProximaPartida(
   if (esperando.length >= 2) return { timeAId: esperando[0]!.id, timeBId: esperando[1]!.id };
   return { timeAId: esperando[0]!.id, timeBId: ultima.timeAId };
 }
+
+export interface EntradaSubstituicao {
+  /** Quem sai (cansado, machucado) e os colegas que continuam, em estrelas. */
+  saindo: JogadorDaPartida;
+  /** Time de quem sai, incluindo quem sai. */
+  meuTime: JogadorDaPartida[];
+  /** O adversário da partida em andamento. */
+  adversario: JogadorDaPartida[];
+  /** Quem espera e pode entrar (de fora da partida). */
+  candidatos: JogadorDaPartida[];
+}
+
+export interface CandidatoSubstituto extends JogadorDaPartida {
+  /** Média de estrelas do time depois da troca. */
+  mediaDoTime: number;
+  /** |média do time depois da troca − média do adversário|: menor = melhor encaixe. */
+  diferenca: number;
+}
+
+function media(js: JogadorDaPartida[]): number {
+  return js.length === 0 ? 0 : somaEstrelas(js) / js.length;
+}
+
+/**
+ * Candidatos a substituir um jogador, do que melhor se encaixa para o pior. O
+ * encaixe é o time (sem quem sai, com quem entra) ficar com a força mais
+ * próxima da do adversário — compara médias, então vale mesmo com times de
+ * tamanhos diferentes. No empate, vence quem tem estrelas mais parecidas com as
+ * de quem sai; persistindo, a ordem recebida.
+ */
+export function rankearSubstitutos(e: EntradaSubstituicao): CandidatoSubstituto[] {
+  const restantes = e.meuTime.filter((j) => j.profileId !== e.saindo.profileId);
+  const alvo = media(e.adversario);
+  return e.candidatos
+    .map((c, ordem) => {
+      const mediaDoTime = media([...restantes, c]);
+      return { c, ordem, mediaDoTime, diferenca: Math.abs(mediaDoTime - alvo) };
+    })
+    .sort(
+      (x, y) =>
+        x.diferenca - y.diferenca ||
+        Math.abs(x.c.estrelas - e.saindo.estrelas) - Math.abs(y.c.estrelas - e.saindo.estrelas) ||
+        x.ordem - y.ordem,
+    )
+    .map(({ c, mediaDoTime, diferenca }) => ({ ...c, mediaDoTime, diferenca }));
+}
+
+/**
+ * Fila dos times que estão esperando (fora da partida em andamento), do próximo
+ * a jogar ao último: os completos antes dos incompletos, e entre iguais quem
+ * jogou há mais tempo (quem nunca jogou primeiro), depois pelo número do time.
+ */
+export function filaDeEspera(
+  times: TimeParaSugestao[],
+  anteriores: { timeAId: string; timeBId: string }[],
+  emJogo: string[],
+): string[] {
+  const porTime = Math.max(0, ...times.map((t) => t.jogadores));
+  const ultimaVez = new Map<string, number>();
+  anteriores.forEach((p, i) => {
+    ultimaVez.set(p.timeAId, i);
+    ultimaVez.set(p.timeBId, i);
+  });
+  return times
+    .filter((t) => !emJogo.includes(t.id))
+    .sort(
+      (a, b) =>
+        Number(b.jogadores >= porTime) - Number(a.jogadores >= porTime) ||
+        (ultimaVez.get(a.id) ?? -1) - (ultimaVez.get(b.id) ?? -1) ||
+        a.numero - b.numero,
+    )
+    .map((t) => t.id);
+}
