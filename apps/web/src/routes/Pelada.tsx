@@ -6,6 +6,7 @@ import { useAuth } from '../lib/auth';
 import { api, ApiError, baixarPng } from '../lib/api';
 import { Aviso, Button, Card, Chip, Estrelas, Eyebrow, Input, MiniCartinha, Spinner, StatTile } from '../components/ui';
 import { CartinhaModal } from '../components/Cartinha';
+import { EditarTimeModal } from './pelada/EditarTimeModal';
 
 interface Presenca {
   profileId: string;
@@ -368,14 +369,12 @@ function BotaoBaixarArte({ peladaId }: { peladaId: string }) {
 function GradeDeTimes({
   times,
   onVerJogador,
-  aoMover,
-  movendo,
+  aoEditar,
 }: {
   times: TimeResultado[];
   onVerJogador: (j: { id: string; nome: string | null }) => void;
-  /** Se informado, cada jogador ganha um seletor "Mover…" (rascunho do admin). */
-  aoMover?: (profileId: string, timeNumero: number) => void;
-  movendo?: boolean;
+  /** Se informado, cada time ganha o botão "Editar time" (rascunho do admin). */
+  aoEditar?: (numero: number) => void;
 }) {
   return (
     <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
@@ -383,7 +382,19 @@ function GradeDeTimes({
         <div key={t.numero} className="overflow-hidden rounded-xl border border-tinta-line/70">
           <div className="flex items-center justify-between bg-gramado-dark px-3 py-2 text-white">
             <span className="font-display text-sm font-bold uppercase tracking-[0.05em]">Time {t.numero}</span>
-            <Estrelas n={t.totalEstrelas / Math.max(1, t.jogadores.length)} />
+            <span className="flex items-center gap-2">
+              <Estrelas n={t.totalEstrelas / Math.max(1, t.jogadores.length)} />
+              {aoEditar && (
+                <button
+                  type="button"
+                  aria-label={`Editar time ${t.numero}`}
+                  onClick={() => aoEditar(t.numero)}
+                  className="rounded-md border border-white/30 px-2 py-0.5 font-display text-[0.7rem] font-semibold uppercase tracking-[0.04em] text-white hover:bg-white/10"
+                >
+                  Editar time
+                </button>
+              )}
+            </span>
           </div>
           <ul className="divide-y divide-tinta-line/50 bg-gramado-raised text-sm">
             {t.jogadores.map((j) => (
@@ -395,29 +406,7 @@ function GradeDeTimes({
                 >
                   {j.nome ?? 'Jogador'}
                 </button>
-                <span className="flex shrink-0 items-center gap-2">
-                  <Estrelas n={j.estrelas} />
-                  {aoMover && (
-                    <select
-                      aria-label={`Mover ${j.nome ?? 'jogador'} para outro time`}
-                      value=""
-                      disabled={movendo}
-                      onChange={(e) => {
-                        if (e.target.value) aoMover(j.profileId, Number(e.target.value));
-                      }}
-                      className="rounded-md border border-tinta-line bg-white px-1 py-0.5 text-xs text-tinta-soft disabled:opacity-50"
-                    >
-                      <option value="">Mover…</option>
-                      {times
-                        .filter((o) => o.numero !== t.numero)
-                        .map((o) => (
-                          <option key={o.numero} value={o.numero}>
-                            Time {o.numero}
-                          </option>
-                        ))}
-                    </select>
-                  )}
-                </span>
+                <Estrelas n={j.estrelas} />
               </li>
             ))}
           </ul>
@@ -482,6 +471,7 @@ function PainelSorteio({
   const [quantidade, setQuantidade] = useState('2');
   const [erro, setErro] = useState<string | null>(null);
   const [verCard, setVerCard] = useState<{ id: string; nome: string | null } | null>(null);
+  const [editando, setEditando] = useState<number | null>(null);
 
   const digitado = Number(quantidade);
   const valido = quantidade !== '' && Number.isFinite(digitado) && digitado >= 1;
@@ -640,9 +630,22 @@ function PainelSorteio({
       <GradeDeTimes
         times={times}
         onVerJogador={setVerCard}
-        {...(confirmado ? {} : { aoMover: (profileId: string, timeNumero: number) => mover.mutate({ profileId, timeNumero }) })}
-        movendo={mover.isPending}
+        {...(confirmado ? {} : { aoEditar: setEditando })}
       />
+
+      {editando !== null && !confirmado && (
+        <EditarTimeModal
+          numero={editando}
+          times={times}
+          aoMover={(profileId, timeNumero) => mover.mutate({ profileId, timeNumero })}
+          movendo={mover.isPending}
+          erro={erro}
+          onFechar={() => {
+            setEditando(null);
+            setErro(null);
+          }}
+        />
+      )}
 
       {verCard && (
         <CartinhaModal
