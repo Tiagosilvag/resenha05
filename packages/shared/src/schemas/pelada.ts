@@ -38,6 +38,11 @@ export const criarPeladaDaConfigSchema = z.object({
   data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
+/** Dono ajusta o valor de uma pelada já gerada (ex.: foi gerada antes da configuração ter valor). */
+export const definirValorPeladaSchema = z.object({
+  valor: dinheiro,
+});
+
 export const confirmarPresencaSchema = z.object({
   status: z.enum(['confirmado', 'desistiu']).optional(),
 });

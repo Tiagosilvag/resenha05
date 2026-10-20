@@ -7,6 +7,7 @@ import {
   confirmarPresencaSchema,
   marcarPagamentoSchema,
   mudarStatusPeladaSchema,
+  definirValorPeladaSchema,
   valorEmCentavos,
 } from '@resenha05/shared';
 import { db } from '../../db/index.js';
@@ -483,6 +484,21 @@ export const rotasPeladas: FastifyPluginAsync = async (app) => {
         })
         .where('pelada_id', '=', peladaId)
         .where('profile_id', '=', profileId)
+        .execute();
+      return { ok: true };
+    });
+
+    // Ajusta o valor de uma pelada já gerada (ex.: gerada antes da config ter
+    // valor, ou um ajuste pontual pra essa semana). Dinheiro: só o dono.
+    r.patch('/peladas/:peladaId/valor', async (req) => {
+      const { peladaId } = req.params as { peladaId: string };
+      const pelada = await orgDaPelada(req, peladaId);
+      exigirDono(req, pelada.organizacao_id);
+      const { valor } = validar(definirValorPeladaSchema, req.body);
+      await db
+        .updateTable('peladas')
+        .set({ valor: valor != null ? String(valor) : null })
+        .where('id', '=', peladaId)
         .execute();
       return { ok: true };
     });

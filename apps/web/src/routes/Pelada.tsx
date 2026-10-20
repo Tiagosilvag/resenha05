@@ -10,6 +10,7 @@ import {
 } from '@resenha05/shared';
 import { useAuth } from '../lib/auth';
 import { api, ApiError, baixarPng } from '../lib/api';
+import { formatarReais } from '../lib/dinheiro';
 import { Aviso, Button, Card, Chip, Estrelas, Eyebrow, Input, MiniCartinha, Spinner, StatTile } from '../components/ui';
 import { CartinhaModal } from '../components/Cartinha';
 import { EditarTimeModal } from './pelada/EditarTimeModal';
@@ -175,6 +176,8 @@ export function Pelada() {
       </div>
 
       {erro && <Aviso tipo="erro">{erro}</Aviso>}
+
+      <ValorDaPelada peladaId={peladaId} valor={data.pelada.valor} souDono={souDono} />
 
       <div className="grid grid-cols-3 gap-2.5">
         <StatTile valor={confirmados.length} rotulo="na lista" />
@@ -419,6 +422,79 @@ interface MembroOrg {
 interface SorteioResp {
   sorteio: { id: string; confirmado: boolean } | null;
   times: TimeResultado[];
+}
+
+function ValorDaPelada({
+  peladaId,
+  valor,
+  souDono,
+}: {
+  peladaId: string;
+  valor: string | null;
+  souDono: boolean;
+}) {
+  const qc = useQueryClient();
+  const [editando, setEditando] = useState(false);
+  const [campo, setCampo] = useState(valor ?? '');
+  const [erro, setErro] = useState<string | null>(null);
+
+  const salvar = useMutation({
+    mutationFn: () => {
+      const limpo = campo.trim();
+      const n = limpo ? Number(limpo.replace(',', '.')) : null;
+      if (n != null && (!Number.isFinite(n) || n < 0)) throw new Error('Valor inválido.');
+      return api(`/peladas/${peladaId}/valor`, { method: 'PATCH', json: { valor: n } });
+    },
+    onSuccess: () => {
+      setEditando(false);
+      setErro(null);
+      qc.invalidateQueries({ queryKey: ['pelada', peladaId] });
+    },
+    onError: (e) => setErro(e instanceof ApiError ? e.message : 'Valor inválido.'),
+  });
+
+  if (!souDono) {
+    return valor != null ? (
+      <p className="text-sm text-tinta-soft">Valor desta pelada: {formatarReais(valor)}</p>
+    ) : null;
+  }
+
+  if (!editando) {
+    return (
+      <button
+        type="button"
+        className="self-start text-sm font-medium text-campo-700 underline-offset-2 hover:underline"
+        onClick={() => {
+          setCampo(valor ?? '');
+          setEditando(true);
+        }}
+      >
+        {valor != null ? `Valor desta pelada: ${formatarReais(valor)} · editar` : 'Definir valor desta pelada'}
+      </button>
+    );
+  }
+
+  return (
+    <Card className="flex flex-col gap-2">
+      {erro && <Aviso tipo="erro">{erro}</Aviso>}
+      <div className="flex items-center gap-2">
+        <Input
+          inputMode="decimal"
+          placeholder="0,00"
+          value={campo}
+          onChange={(e) => setCampo(e.target.value)}
+          className="max-w-[10rem]"
+        />
+        <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
+          {salvar.isPending ? <Spinner /> : 'Salvar'}
+        </Button>
+        <Button variante="secundario" onClick={() => setEditando(false)} disabled={salvar.isPending}>
+          Cancelar
+        </Button>
+      </div>
+      <p className="text-xs text-tinta-faint">Deixe em branco pra essa pelada não cobrar dos jogadores.</p>
+    </Card>
+  );
 }
 
 function BotaoBaixarArte({ peladaId }: { peladaId: string }) {
