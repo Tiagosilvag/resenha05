@@ -7,6 +7,7 @@ import {
   confirmarPresencaSchema,
   marcarPagamentoSchema,
   mudarStatusPeladaSchema,
+  valorEmCentavos,
 } from '@resenha05/shared';
 import { db } from '../../db/index.js';
 import { env } from '../../env.js';
@@ -209,7 +210,8 @@ export const rotasPeladas: FastifyPluginAsync = async (app) => {
     r.get('/peladas/:peladaId', async (req) => {
       const { peladaId } = req.params as { peladaId: string };
       const pelada = await orgDaPelada(req, peladaId);
-      exigirMembro(req, pelada.organizacao_id);
+      const vinculo = exigirMembro(req, pelada.organizacao_id);
+      const souAdmin = vinculo.papel === 'admin' || vinculo.papel === 'admin_principal';
 
       const presencas = await db
         .selectFrom('presencas as pr')
@@ -227,13 +229,35 @@ export const rotasPeladas: FastifyPluginAsync = async (app) => {
           'pr.status as status',
           'pr.confirmado_em as confirmadoEm',
           'm.estrelas as estrelas',
+          'pr.pago_em as pagoEm',
+          'pr.pago_metodo as pagoMetodo',
+          'pr.pagamento_declarado_em as declaradoPagoEm',
         ])
         .where('pr.pelada_id', '=', peladaId)
         .orderBy('pr.confirmado_em')
         .execute();
 
-      const meu = presencas.find((x) => x.profileId === req.usuario.id) ?? null;
-      return { pelada, presencas, minhaPresenca: meu };
+      // Quem avisou que pagou só aparece para os administradores (e para o próprio jogador).
+      const visiveis = presencas.map((x) =>
+        souAdmin || x.profileId === req.usuario.id ? x : { ...x, declaradoPagoEm: null },
+      );
+      const meu = visiveis.find((x) => x.profileId === req.usuario.id) ?? null;
+
+      const org = await db
+        .selectFrom('organizacoes')
+        .select(['pagamento_jogador_modo', 'pix_chave', 'pix_favorecido', 'pix_instrucoes', 'nome'])
+        .where('id', '=', pelada.organizacao_id)
+        .executeTakeFirstOrThrow();
+      const pagamento = {
+        modo: org.pagamento_jogador_modo,
+        valorCentavos: valorEmCentavos(pelada.valor),
+        organizacaoNome: org.nome,
+        pix:
+          org.pagamento_jogador_modo === 'pix' && org.pix_chave
+            ? { chave: org.pix_chave, favorecido: org.pix_favorecido, instrucoes: org.pix_instrucoes }
+            : null,
+      };
+      return { pelada, presencas: visiveis, minhaPresenca: meu, pagamento };
     });
 
     r.post('/peladas/:peladaId/presenca', async (req, reply) => {
@@ -244,6 +268,18 @@ export const rotasPeladas: FastifyPluginAsync = async (app) => {
 
       const d = validar(confirmarPresencaSchema, req.body);
       const status = d.status ?? 'confirmado';
+
+      // Quem já pagou continua pago: confirmar de novo (ou marcar "desisti") não apaga o pagamento.
+      const existente = await db
+        .selectFrom('presencas')
+        .select('status')
+        .where('pelada_id', '=', peladaId)
+        .where('profile_id', '=', req.usuario.id)
+        .executeTakeFirst();
+      if (existente?.status === 'pago') {
+        reply.code(200);
+        return { ok: true, status: 'pago' };
+      }
       await db
         .insertInto('presencas')
         .values({ pelada_id: peladaId, profile_id: req.usuario.id, status })
@@ -259,6 +295,15 @@ export const rotasPeladas: FastifyPluginAsync = async (app) => {
       const { peladaId } = req.params as { peladaId: string };
       const pelada = await orgDaPelada(req, peladaId);
       exigirMembro(req, pelada.organizacao_id);
+      const existente = await db
+        .selectFrom('presencas')
+        .select('status')
+        .where('pelada_id', '=', peladaId)
+        .where('profile_id', '=', req.usuario.id)
+        .executeTakeFirst();
+      if (existente?.status === 'pago') {
+        throw erro.conflito('Você já pagou esta pelada. Fale com o organizador se não puder mais ir.');
+      }
       await db
         .deleteFrom('presencas')
         .where('pelada_id', '=', peladaId)
@@ -304,12 +349,33 @@ export const rotasPeladas: FastifyPluginAsync = async (app) => {
         .executeTakeFirst();
       if (!membro) throw erro.invalido('Esse jogador não faz parte da organização.');
 
+      const novoStatus = status ?? 'confirmado';
+      const existente = await db
+        .selectFrom('presencas')
+        .select('status')
+        .where('pelada_id', '=', peladaId)
+        .where('profile_id', '=', profileId)
+        .executeTakeFirst();
+      // Adicionar de novo alguém que já pagou não desfaz o pagamento.
+      if (existente?.status === 'pago' && novoStatus !== 'pago') {
+        reply.code(201);
+        return { ok: true };
+      }
+      const dados =
+        novoStatus === 'pago'
+          ? {
+              status: 'pago' as const,
+              pago_em: new Date(),
+              pago_por: req.usuario.id,
+              pago_valor: valorEmCentavos(pelada.valor) ? (valorEmCentavos(pelada.valor)! / 100).toFixed(2) : null,
+              pago_metodo: 'manual' as const,
+              pagamento_declarado_em: null,
+            }
+          : { status: novoStatus };
       await db
         .insertInto('presencas')
-        .values({ pelada_id: peladaId, profile_id: profileId, status: status ?? 'confirmado' })
-        .onConflict((oc) =>
-          oc.columns(['pelada_id', 'profile_id']).doUpdateSet({ status: status ?? 'confirmado' }),
-        )
+        .values({ pelada_id: peladaId, profile_id: profileId, ...dados })
+        .onConflict((oc) => oc.columns(['pelada_id', 'profile_id']).doUpdateSet(dados))
         .execute();
       reply.code(201);
       return { ok: true };
@@ -369,15 +435,50 @@ export const rotasPeladas: FastifyPluginAsync = async (app) => {
       exigirAdmin(req, pelada.organizacao_id);
       const { profileId, pago } = validar(marcarPagamentoSchema, req.body);
 
-      const atualizado = await db
-        .updateTable('presencas')
-        .set({ status: pago ? 'pago' : 'confirmado' })
+      const atual = await db
+        .selectFrom('presencas')
+        .select(['status', 'pagamento_declarado_em', 'mp_payment_id'])
         .where('pelada_id', '=', peladaId)
         .where('profile_id', '=', profileId)
         .executeTakeFirst();
-      if (atualizado.numUpdatedRows === 0n) {
-        throw erro.naoEncontrado('Esse jogador não está na lista desta pelada.');
+      if (!atual) throw erro.naoEncontrado('Esse jogador não está na lista desta pelada.');
+
+      if (pago) {
+        const centavos = valorEmCentavos(pelada.valor);
+        await db
+          .updateTable('presencas')
+          .set({
+            status: 'pago',
+            pago_em: new Date(),
+            pago_por: req.usuario.id,
+            pago_valor: centavos ? (centavos / 100).toFixed(2) : null,
+            // Quem avisou "já paguei" pagou por Pix; senão o admin recebeu por fora.
+            pago_metodo: atual.pagamento_declarado_em ? 'pix' : 'manual',
+            pagamento_declarado_em: null,
+          })
+          .where('pelada_id', '=', peladaId)
+          .where('profile_id', '=', profileId)
+          .execute();
+        return { ok: true };
       }
+
+      // Pagamento feito pelo Mercado Pago não se desfaz aqui: o estorno é lá.
+      if (atual.mp_payment_id) {
+        throw erro.conflito('Este pagamento foi feito pelo Mercado Pago. Para devolver, faça o estorno no Mercado Pago.');
+      }
+      await db
+        .updateTable('presencas')
+        .set({
+          status: 'confirmado',
+          pago_em: null,
+          pago_por: null,
+          pago_valor: null,
+          pago_metodo: null,
+          pagamento_declarado_em: null,
+        })
+        .where('pelada_id', '=', peladaId)
+        .where('profile_id', '=', profileId)
+        .execute();
       return { ok: true };
     });
 

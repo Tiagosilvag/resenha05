@@ -21,6 +21,13 @@ const schema = z.object({
 
   WEB_ORIGIN: z.string().default('http://localhost:5173'),
 
+  // OAuth do Mercado Pago ("Conectar"): credenciais da aplicação da plataforma. Vazio =
+  // o botão "Conectar" fica indisponível e vale o Access Token colado à mão.
+  MP_OAUTH_CLIENT_ID: z.string().optional(),
+  MP_OAUTH_CLIENT_SECRET: z.string().optional(),
+  // "1" só depois de ligar o PKCE no painel da aplicação do Mercado Pago.
+  MP_OAUTH_PKCE: z.string().optional(),
+
   // Pasta onde as fotos de perfil são gravadas (volume no compose).
   UPLOADS_DIR: z.string().default('uploads'),
 

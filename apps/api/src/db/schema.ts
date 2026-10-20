@@ -53,6 +53,17 @@ export interface OrganizacoesTable {
   mp_token_cipher: Buffer | null;
   mp_token_nonce: Buffer | null;
   mp_token_atualizado_em: Timestamp | null;
+  pagamento_jogador_modo: Generated<'manual' | 'pix' | 'mercadopago'>;
+  pix_chave: string | null;
+  pix_favorecido: string | null;
+  pix_instrucoes: string | null;
+  mp_oauth_user_id: string | null;
+  mp_oauth_access_cipher: Buffer | null;
+  mp_oauth_access_nonce: Buffer | null;
+  mp_oauth_refresh_cipher: Buffer | null;
+  mp_oauth_refresh_nonce: Buffer | null;
+  mp_oauth_expira_em: Timestamp | null;
+  mp_oauth_conectado_em: Timestamp | null;
   status_assinatura: Generated<StatusAssinatura>;
   criado_em: Generated<Timestamp>;
 }
@@ -103,6 +114,33 @@ export interface PresencasTable {
   status: Generated<'confirmado' | 'pago' | 'desistiu'>;
   confirmado_em: Generated<Timestamp>;
   atualizado_em: Generated<Timestamp>;
+  // Trilha do pagamento (quem marcou, quando, quanto e por qual meio).
+  pago_em: Timestamp | null;
+  pago_por: string | null;
+  pago_valor: string | null;
+  pago_metodo: 'manual' | 'pix' | 'mercadopago' | null;
+  mp_payment_id: string | null;
+  pagamento_declarado_em: Timestamp | null;
+}
+
+export interface PagamentosJogadorTable {
+  id: Generated<string>;
+  organizacao_id: string;
+  pelada_id: string;
+  profile_id: string;
+  valor_centavos: number;
+  status: Generated<'pendente' | 'aprovado' | 'cancelado'>;
+  mp_payment_id: string | null;
+  criado_em: Generated<Timestamp>;
+  atualizado_em: TimestampComDefault;
+}
+
+export interface OauthEstadosTable {
+  estado: string;
+  organizacao_id: string;
+  code_verifier: string | null;
+  criado_por: string | null;
+  criado_em: Generated<Timestamp>;
 }
 
 export interface SorteiosTable {
@@ -287,4 +325,6 @@ export interface Database {
   assinaturas: AssinaturasTable;
   partida_jogadores: PartidaJogadoresTable;
   partida_substituicoes: PartidaSubstituicoesTable;
+  pagamentos_jogador: PagamentosJogadorTable;
+  oauth_estados: OauthEstadosTable;
 }

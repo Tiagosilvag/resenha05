@@ -40,3 +40,5 @@ export interface OrganizacaoDoUsuario {
 }
 export * from './partida.js';
 export * from './diagnostico-mp.js';
+export * from './pix.js';
+export * from './pagamento-jogador.js';

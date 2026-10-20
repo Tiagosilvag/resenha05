@@ -34,6 +34,10 @@ services:
       # Obrigatória: sem ela a API não sobe (env.ts). Ver .env.example.
       PLATAFORMA_DEV_TELEFONE: ${PLATAFORMA_DEV_TELEFONE:?defina PLATAFORMA_DEV_TELEFONE (telefone do dev da plataforma)}
       WEB_ORIGIN: ${WEB_ORIGIN:-https://resenha05.coffetech.com.br}
+      # OAuth do Mercado Pago (botão "Conectar" das organizações). Vazio = indisponível.
+      MP_OAUTH_CLIENT_ID: ${MP_OAUTH_CLIENT_ID:-}
+      MP_OAUTH_CLIENT_SECRET: ${MP_OAUTH_CLIENT_SECRET:-}
+      MP_OAUTH_PKCE: ${MP_OAUTH_PKCE:-}
       UPLOADS_DIR: /data/uploads
       # Recorte de fundo da foto (card estilo FIFA) — container interno abaixo.
       BGREMOVE_URL: http://bgremove:7000

@@ -1,7 +1,13 @@
-import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { amplitudeEntreTimesCheios, peladaExigePagamento, statusNoSorteio } from '@resenha05/shared';
+import {
+  amplitudeEntreTimesCheios,
+  gerarPixCopiaECola,
+  peladaExigePagamento,
+  statusNoSorteio,
+  type ModoPagamentoJogador,
+} from '@resenha05/shared';
 import { useAuth } from '../lib/auth';
 import { api, ApiError, baixarPng } from '../lib/api';
 import { Aviso, Button, Card, Chip, Estrelas, Eyebrow, Input, MiniCartinha, Spinner, StatTile } from '../components/ui';
@@ -15,6 +21,15 @@ interface Presenca {
   fotoRecortada: boolean;
   status: 'confirmado' | 'pago' | 'desistiu';
   estrelas: number | null;
+  /** O jogador avisou que pagou por Pix; o admin ainda confirma (só admins e o próprio jogador veem). */
+  declaradoPagoEm: string | null;
+  pagoMetodo: 'manual' | 'pix' | 'mercadopago' | null;
+}
+interface DadosDePagamento {
+  modo: ModoPagamentoJogador;
+  valorCentavos: number | null;
+  organizacaoNome: string;
+  pix: { chave: string; favorecido: string | null; instrucoes: string | null } | null;
 }
 interface PeladaResp {
   pelada: {
@@ -28,6 +43,7 @@ interface PeladaResp {
   };
   presencas: Presenca[];
   minhaPresenca: Presenca | null;
+  pagamento: DadosDePagamento;
 }
 
 export function Pelada() {
@@ -112,6 +128,7 @@ export function Pelada() {
   const sairDaLista = useMutation({
     mutationFn: () => api(`/peladas/${peladaId}/presenca`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['pelada', peladaId] }),
+    onError: (e) => setErro(e instanceof ApiError ? e.message : 'Não foi possível sair da lista.'),
   });
 
   if (isLoading || !data) return <Spinner className="h-6 w-6 text-campo-600" />;
@@ -177,6 +194,15 @@ export function Pelada() {
         )
       ) : (
         <Aviso>A lista desta pelada está {data.pelada.status}.</Aviso>
+      )}
+
+      {dentro && data.minhaPresenca && data.pagamento.valorCentavos && (
+        <PagamentoDoJogador
+          peladaId={peladaId}
+          pagamento={data.pagamento}
+          minha={data.minhaPresenca}
+          onMudou={() => qc.invalidateQueries({ queryKey: ['pelada', peladaId] })}
+        />
       )}
 
       {admin && (
@@ -287,6 +313,11 @@ export function Pelada() {
                   {p.estrelas != null && <Estrelas n={p.estrelas} className="mt-0.5" />}
                 </span>
               </button>
+              {admin && p.status === 'confirmado' && p.declaradoPagoEm && (
+                <span className="shrink-0 rounded-full bg-ouro-100 px-2 py-0.5 font-display text-[0.62rem] font-bold uppercase tracking-[0.04em] text-ouro-700">
+                  avisou que pagou
+                </span>
+              )}
               {admin && p.status !== 'desistiu' ? (
                 <button
                   type="button"
@@ -464,6 +495,148 @@ function LinkPartidas({ peladaId }: { peladaId: string }) {
     >
       Partidas e placar
     </Link>
+  );
+}
+
+/** O que o jogador faz para pagar, conforme a organização escolheu (manual, Pix ou Mercado Pago). */
+function PagamentoDoJogador({
+  peladaId,
+  pagamento,
+  minha,
+  onMudou,
+}: {
+  peladaId: string;
+  pagamento: DadosDePagamento;
+  minha: Presenca;
+  onMudou: () => void;
+}) {
+  const [params, setParams] = useSearchParams();
+  const [erro, setErro] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<{ tipo: 'ok' | 'info' | 'erro'; texto: string } | null>(null);
+  const [copiado, setCopiado] = useState<'chave' | 'codigo' | null>(null);
+  const pago = minha.status === 'pago';
+  const reais = (pagamento.valorCentavos ?? 0) / 100;
+  const valorTxt = reais.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const falhou = (e: unknown) => setErro(e instanceof ApiError ? e.message : 'Não foi possível concluir.');
+
+  const declarar = useMutation({
+    mutationFn: () => api(`/peladas/${peladaId}/pagamento/declarar`, { method: 'POST' }),
+    onSuccess: () => {
+      setErro(null);
+      onMudou();
+    },
+    onError: falhou,
+  });
+  const pagar = useMutation({
+    mutationFn: () => api<{ checkoutUrl: string }>(`/peladas/${peladaId}/pagamento/mercadopago`, { method: 'POST' }),
+    onSuccess: (r) => {
+      window.location.href = r.checkoutUrl;
+    },
+    onError: falhou,
+  });
+  const conferir = useMutation({
+    mutationFn: (paymentId: string) =>
+      api<{ resultado: string; statusMp: string }>(`/peladas/${peladaId}/pagamento/mercadopago/conferir`, {
+        method: 'POST',
+        json: { paymentId },
+      }),
+    onSuccess: (r) => {
+      onMudou();
+      if (r.resultado === 'aplicar' || r.resultado === 'ja_aplicado') {
+        setAviso({ tipo: 'ok', texto: 'Pagamento aprovado! Você está com o pagamento em dia.' });
+      } else if (r.statusMp === 'pending' || r.statusMp === 'in_process') {
+        setAviso({ tipo: 'info', texto: 'Pagamento em análise. Assim que for aprovado, aparece aqui como pago.' });
+      } else {
+        setAviso({ tipo: 'erro', texto: 'O pagamento não foi aprovado. Você pode tentar de novo.' });
+      }
+    },
+    onError: falhou,
+  });
+
+  // O Mercado Pago volta para esta página com ?payment_id=...: confere na hora.
+  const paymentId = params.get('payment_id') ?? params.get('collection_id');
+  useEffect(() => {
+    if (!paymentId || pagamento.modo !== 'mercadopago') return;
+    conferir.mutate(paymentId);
+    setParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentId]);
+
+  const copiar = async (texto: string, qual: 'chave' | 'codigo') => {
+    try {
+      await navigator.clipboard.writeText(texto);
+      setCopiado(qual);
+      setTimeout(() => setCopiado(null), 2000);
+    } catch {
+      setErro('Não foi possível copiar. Selecione o texto e copie manualmente.');
+    }
+  };
+
+  const pix = pagamento.pix;
+  const copiaECola = pix
+    ? gerarPixCopiaECola({ chave: pix.chave, favorecido: pix.favorecido ?? pagamento.organizacaoNome, valor: reais, txid: peladaId.replace(/-/g, '').slice(0, 20) })
+    : null;
+
+  return (
+    <Card as="section" className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-2">
+        <Eyebrow className="!mb-0">Pagamento</Eyebrow>
+        <span className="placar-num text-lg text-campo-800">{valorTxt}</span>
+      </div>
+      {erro && <Aviso tipo="erro">{erro}</Aviso>}
+      {aviso && !(pago && aviso.tipo === 'ok') && <Aviso tipo={aviso.tipo}>{aviso.texto}</Aviso>}
+      {conferir.isPending && (
+        <div className="flex items-center gap-2 text-sm text-tinta-soft">
+          <Spinner className="h-4 w-4 text-campo-600" /> Conferindo o pagamento…
+        </div>
+      )}
+
+      {pago ? (
+        <Aviso tipo="ok">
+          Pagamento confirmado
+          {minha.pagoMetodo === 'pix' ? ' (Pix)' : minha.pagoMetodo === 'mercadopago' ? ' (Mercado Pago)' : ''}. Obrigado!
+        </Aviso>
+      ) : pagamento.modo === 'manual' ? (
+        <p className="text-sm text-tinta-soft">Combine o pagamento com o organizador. Ele marca aqui quando receber.</p>
+      ) : pagamento.modo === 'pix' && pix && copiaECola ? (
+        <>
+          <p className="text-sm text-tinta-soft">
+            Pague {valorTxt} por Pix{pix.favorecido ? ` para ${pix.favorecido}` : ''} e depois toque em “Já paguei”.
+          </p>
+          <div className="rounded-xl border border-tinta-line bg-gramado-sunk px-3 py-2 text-sm">
+            <p className="eyebrow mb-0.5">Chave Pix</p>
+            <p className="break-all font-medium">{pix.chave}</p>
+          </div>
+          {pix.instrucoes && <p className="text-sm text-tinta-soft">{pix.instrucoes}</p>}
+          <div className="grid grid-cols-2 gap-2">
+            <Button variante="secundario" className="!px-2 !text-[0.8rem]" onClick={() => copiar(pix.chave, 'chave')}>
+              {copiado === 'chave' ? 'Copiado!' : 'Copiar chave'}
+            </Button>
+            <Button variante="secundario" className="!px-2 !text-[0.8rem]" onClick={() => copiar(copiaECola, 'codigo')}>
+              {copiado === 'codigo' ? 'Copiado!' : 'Pix copia e cola'}
+            </Button>
+          </div>
+          {minha.declaradoPagoEm ? (
+            <Aviso tipo="info">Você avisou que pagou. Aguardando o organizador confirmar.</Aviso>
+          ) : (
+            <Button disabled={declarar.isPending} onClick={() => declarar.mutate()}>
+              {declarar.isPending ? <Spinner /> : 'Já paguei'}
+            </Button>
+          )}
+        </>
+      ) : pagamento.modo === 'mercadopago' ? (
+        <>
+          <p className="text-sm text-tinta-soft">
+            Pague por Pix ou cartão, sem precisar de conta no Mercado Pago. O “pago” é marcado sozinho.
+          </p>
+          <Button disabled={pagar.isPending} onClick={() => pagar.mutate()}>
+            {pagar.isPending ? <Spinner /> : `Pagar ${valorTxt}`}
+          </Button>
+        </>
+      ) : (
+        <p className="text-sm text-tinta-soft">O organizador ainda não configurou como receber. Combine com ele.</p>
+      )}
+    </Card>
   );
 }
 

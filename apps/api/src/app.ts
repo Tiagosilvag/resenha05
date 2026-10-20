@@ -15,6 +15,7 @@ import { rotasOrganizacoes } from './modules/organizacoes/rotas.js';
 import { rotasPeladas } from './modules/peladas/rotas.js';
 import { rotasSorteio } from './modules/sorteio/rotas.js';
 import { rotasPartidas } from './modules/partidas/rotas.js';
+import { rotasPagamentoJogadores, rotasPublicasPagamentoJogadores } from './modules/pagamento-jogadores/rotas.js';
 import { rotasTorneios } from './modules/torneios/rotas.js';
 import { rotasEstatisticas } from './modules/estatisticas/rotas.js';
 import { rotasCartinha } from './modules/cartinha/rotas.js';
@@ -84,6 +85,8 @@ export async function construirApp() {
       await api.register(rotasCartinha);
       await api.register(rotasAdminPlataforma);
       await api.register(rotasWebhookAssinatura);
+      await api.register(rotasPagamentoJogadores);
+      await api.register(rotasPublicasPagamentoJogadores);
     },
     { prefix: '/api' },
   );
