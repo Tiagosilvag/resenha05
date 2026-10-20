@@ -1,3 +1,5 @@
+import { mpApi } from './mercadopago-base.js';
+
 export interface CriarPreapprovalInput {
   accessToken: string;
   reason: string;
@@ -19,7 +21,7 @@ export interface PreapprovalDetalhe {
   valorCentavos: number;
 }
 
-const BASE_URL = 'https://api.mercadopago.com/preapproval';
+const urlPreapproval = () => `${mpApi()}/preapproval`;
 
 /** Erro devolvido pela API do MP, com o status HTTP (o webhook trata 404 à parte). */
 export class MercadoPagoErro extends Error {
@@ -48,7 +50,7 @@ export async function criarPreapproval(
   input: CriarPreapprovalInput,
   fetchFn: typeof fetch = fetch,
 ): Promise<PreapprovalCriado> {
-  const resp = await fetchFn(BASE_URL, {
+  const resp = await fetchFn(urlPreapproval(), {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${input.accessToken}`,
@@ -79,7 +81,7 @@ export async function buscarPreapproval(
   preapprovalId: string,
   fetchFn: typeof fetch = fetch,
 ): Promise<PreapprovalDetalhe> {
-  const resp = await fetchFn(`${BASE_URL}/${preapprovalId}`, {
+  const resp = await fetchFn(`${urlPreapproval()}/${preapprovalId}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!resp.ok) throw await erroDoMp(resp);

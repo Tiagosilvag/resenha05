@@ -1,5 +1,10 @@
 import type { FastifyPluginAsync } from 'fastify';
+import { randomUUID } from 'node:crypto';
 import {
+  confirmarPagamentoAvulsoSchema,
+  idPagamentoAvulso,
+  proximoMesALiberar,
+  referenciaDoPagamentoAvulso,
   criarOrganizacaoSchema,
   entrarPorCodigoSchema,
   promoverMembroSchema,
@@ -20,6 +25,9 @@ import { erro } from '../../lib/erros.js';
 import { exigirAdmin, exigirDono, exigirMembro } from '../../plugins/auth.js';
 import { cifrarTokenOuErro, decifrarToken } from '../../lib/cripto.js';
 import { criarPreapproval } from '../../lib/mercadopago-preapproval.js';
+import { criarPreferencia } from '../../lib/mercadopago-preferencia.js';
+import { conferirPagamentoAvulso, tokenDaPlataforma } from '../../lib/pagamento-avulso.js';
+import { expirarLiberacoesManuais, situacaoDasLiberacoes, vencimentoManual } from '../../lib/liberacao-manual.js';
 import { exigirOrganizacaoLiberada, traduzirErroCobranca } from '../../lib/assinatura.js';
 import { primeiroDiaDoMesUtc } from '../../lib/periodo.js';
 import { hashSenha } from '../../lib/senha.js';
@@ -67,13 +75,31 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
   app.get('/organizacoes/:id', async (req) => {
     const { id } = req.params as { id: string };
     exigirMembro(req, id);
+    await expirarLiberacoesManuais();
     const o = await db
       .selectFrom('organizacoes')
       .select(['id', 'nome', 'codigo', 'status_assinatura', 'mp_token_cipher', 'mp_token_atualizado_em'])
       .where('id', '=', id)
       .executeTakeFirst();
     if (!o) throw erro.naoEncontrado();
+    const liberacao = (await situacaoDasLiberacoes([id])).get(id);
+    const cfg = await db
+      .selectFrom('plataforma_config')
+      .select('mensalidade_valor_centavos')
+      .where('id', '=', 1)
+      .executeTakeFirstOrThrow();
     return {
+      // Pagamento avulso (Pix/cartão sem conta) e liberação manual valem até o fim do mês.
+      assinaturaAutomatica: liberacao?.pagaPeloMercadoPago ?? false,
+      venceEm: vencimentoManual(liberacao),
+      proximoMesAvulso: (() => {
+        try {
+          return proximoMesALiberar(liberacao?.ultimoPeriodoManual ?? null, new Date());
+        } catch {
+          return null;
+        }
+      })(),
+      mensalidadeCentavos: cfg.mensalidade_valor_centavos,
       id: o.id,
       nome: o.nome,
       codigo: o.codigo,
@@ -453,5 +479,80 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
       .execute();
 
     return { checkoutUrl: preapproval.initPoint };
+  });
+
+  // Dono paga o próximo mês por Pix ou cartão, como convidado (sem conta no
+  // Mercado Pago). Não renova sozinho: vale até o fim do mês pago.
+  app.post('/organizacoes/:id/assinatura/avulso', async (req) => {
+    const { id } = req.params as { id: string };
+    exigirDono(req, id);
+
+    const org = await db.selectFrom('organizacoes').select(['id', 'nome']).where('id', '=', id).executeTakeFirst();
+    if (!org) throw erro.naoEncontrado('Organização não encontrada.');
+
+    await expirarLiberacoesManuais();
+    const situacao = (await situacaoDasLiberacoes([id])).get(id);
+    if (situacao?.pagaPeloMercadoPago) {
+      throw erro.conflito('Esta organização já tem assinatura automática no Mercado Pago.');
+    }
+    let periodo: string;
+    try {
+      periodo = proximoMesALiberar(situacao?.ultimoPeriodoManual ?? null, new Date());
+    } catch (e) {
+      throw erro.conflito(e instanceof Error ? e.message : 'Não dá para pagar mais meses adiantado.');
+    }
+
+    const token = await tokenDaPlataforma();
+    if (!token) throw erro.invalido('Conta Mercado Pago da plataforma ainda não configurada.');
+    const cfg = await db
+      .selectFrom('plataforma_config')
+      .select('mensalidade_valor_centavos')
+      .where('id', '=', 1)
+      .executeTakeFirstOrThrow();
+
+    // A linha pendente nasce antes do pagamento: é ela que o Mercado Pago aponta de volta.
+    const chave = randomUUID();
+    await db
+      .insertInto('assinaturas')
+      .values({
+        organizacao_id: id,
+        mp_preapproval_id: idPagamentoAvulso(chave),
+        periodo_referencia: periodo,
+        valor_centavos: cfg.mensalidade_valor_centavos,
+        status: 'pendente',
+      })
+      .execute();
+
+    try {
+      const preferencia = await criarPreferencia({
+        accessToken: token,
+        titulo: `Mensalidade Resenha05 ${periodo.slice(5, 7)}/${periodo.slice(0, 4)} - ${org.nome}`,
+        valorCentavos: cfg.mensalidade_valor_centavos,
+        externalReference: referenciaDoPagamentoAvulso(chave),
+        backUrl: `${env.WEB_ORIGIN}/org/${id}/assinatura`,
+        notificationUrl: `${env.WEB_ORIGIN}/api/webhooks/mercadopago/assinatura`,
+      });
+      return { checkoutUrl: preferencia.initPoint, periodoReferencia: periodo };
+    } catch (e) {
+      await db.deleteFrom('assinaturas').where('mp_preapproval_id', '=', idPagamentoAvulso(chave)).execute();
+      req.log.error({ err: e }, 'Falha ao criar o pagamento avulso no Mercado Pago');
+      throw traduzirErroCobranca(e, req.usuario.papelPlataforma != null);
+    }
+  });
+
+  // O comprador volta do Mercado Pago com o número do pagamento: confere na hora (sem esperar o webhook).
+  app.post('/organizacoes/:id/assinatura/avulso/conferir', async (req) => {
+    const { id } = req.params as { id: string };
+    exigirDono(req, id);
+    const { paymentId } = validar(confirmarPagamentoAvulsoSchema, req.body);
+    const token = await tokenDaPlataforma();
+    if (!token) throw erro.invalido('Conta Mercado Pago da plataforma ainda não configurada.');
+    try {
+      const r = await conferirPagamentoAvulso(token, paymentId, id);
+      return { resultado: r.decisao, statusMp: r.statusMp, periodoReferencia: r.periodoReferencia };
+    } catch (e) {
+      req.log.error({ err: e }, 'Falha ao conferir o pagamento avulso');
+      throw traduzirErroCobranca(e, req.usuario.papelPlataforma != null);
+    }
   });
 };

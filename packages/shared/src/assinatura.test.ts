@@ -9,6 +9,11 @@ import {
   fimDoMes,
   proximoMesALiberar,
   MESES_MAX_ADIANTE,
+  idPagamentoAvulso,
+  ehPeriodoLimitado,
+  referenciaDoPagamentoAvulso,
+  chaveDaReferenciaAvulsa,
+  decidirPagamentoAvulso,
 } from './assinatura.js';
 
 describe('organizacaoLiberada', () => {
@@ -115,6 +120,50 @@ describe('liberação manual da mensalidade', () => {
       let ultimo: string | null = null;
       for (let i = 0; i < MESES_MAX_ADIANTE; i++) ultimo = proximoMesALiberar(ultimo, hoje);
       expect(() => proximoMesALiberar(ultimo, hoje)).toThrow(/meses/);
+    });
+  });
+});
+
+describe('pagamento avulso', () => {
+  const chave = '3f2504e0-4f89-11d3-9a0c-0305e82c3301';
+
+  it('o id marca a linha como período limitado, igual à liberação manual', () => {
+    expect(ehPeriodoLimitado(idPagamentoAvulso(chave))).toBe(true);
+    expect(ehPeriodoLimitado(idLiberacaoManual('org'))).toBe(true);
+    expect(ehPeriodoLimitado('2c93808472')).toBe(false);
+  });
+
+  it('a referência enviada ao Mercado Pago volta para a chave', () => {
+    expect(chaveDaReferenciaAvulsa(referenciaDoPagamentoAvulso(chave))).toBe(chave);
+    expect(chaveDaReferenciaAvulsa('org:2026-10-01')).toBeNull();
+    expect(chaveDaReferenciaAvulsa(null)).toBeNull();
+  });
+
+  describe('decidirPagamentoAvulso', () => {
+    const linha = { organizacaoId: 'org-1', valorCentavos: 500, status: 'pendente' };
+    const aprovado = { status: 'approved', valor: 5, externalReference: referenciaDoPagamentoAvulso(chave) };
+
+    it('aprovado, valor certo, linha pendente: aplica', () => {
+      expect(decidirPagamentoAvulso({ pagamento: aprovado, linha })).toBe('aplicar');
+    });
+    it('pagamento maior que o cobrado também vale', () => {
+      expect(decidirPagamentoAvulso({ pagamento: { ...aprovado, valor: 10 }, linha })).toBe('aplicar');
+    });
+    it('valor menor que o cobrado não libera', () => {
+      expect(decidirPagamentoAvulso({ pagamento: { ...aprovado, valor: 4.99 }, linha })).toBe('valor_insuficiente');
+    });
+    it('não aprovado (pendente, recusado) não libera', () => {
+      expect(decidirPagamentoAvulso({ pagamento: { ...aprovado, status: 'pending' }, linha })).toBe('nao_aprovado');
+      expect(decidirPagamentoAvulso({ pagamento: { ...aprovado, status: 'rejected' }, linha })).toBe('nao_aprovado');
+    });
+    it('sem linha nossa correspondente, ignora', () => {
+      expect(decidirPagamentoAvulso({ pagamento: aprovado, linha: null })).toBe('desconhecido');
+    });
+    it('já aplicado não aplica de novo (notificação repetida)', () => {
+      expect(decidirPagamentoAvulso({ pagamento: aprovado, linha: { ...linha, status: 'aprovado' } })).toBe('ja_aplicado');
+    });
+    it('pagamento de outra organização não vale para esta', () => {
+      expect(decidirPagamentoAvulso({ pagamento: aprovado, linha, organizacaoEsperada: 'org-2' })).toBe('outra_organizacao');
     });
   });
 });

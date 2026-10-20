@@ -1,3 +1,4 @@
+import { mpApi } from './mercadopago-base.js';
 import { erroDoMp } from './mercadopago-preapproval.js';
 
 export interface ContaMp {
@@ -12,7 +13,7 @@ export interface ContaMp {
  * salvar (401 = o MP não o aceita) e saber se é conta de teste ou real.
  */
 export async function consultarConta(accessToken: string, fetchFn: typeof fetch = fetch): Promise<ContaMp> {
-  const resp = await fetchFn('https://api.mercadopago.com/users/me', {
+  const resp = await fetchFn(`${mpApi()}/users/me`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!resp.ok) throw await erroDoMp(resp);

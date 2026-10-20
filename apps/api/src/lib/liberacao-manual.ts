@@ -1,6 +1,10 @@
 import { sql } from 'kysely';
-import { PREFIXO_LIBERACAO_MANUAL, fimDoMes } from '@resenha05/shared';
+import { PREFIXO_LIBERACAO_MANUAL, PREFIXO_PAGAMENTO_AVULSO, fimDoMes } from '@resenha05/shared';
 import { db } from '../db/index.js';
+
+// Linhas de `assinaturas` que valem só até o fim do mês (liberação manual ou pagamento avulso).
+const MANUAL = `${PREFIXO_LIBERACAO_MANUAL}%`;
+const AVULSO = `${PREFIXO_PAGAMENTO_AVULSO}%`;
 
 export interface SituacaoLiberacao {
   /** Mensalidade que está valendo por um pagamento aprovado no Mercado Pago. */
@@ -20,8 +24,8 @@ export async function situacaoDasLiberacoes(
     .selectFrom('assinaturas')
     .select([
       'organizacao_id as organizacaoId',
-      sql<boolean>`bool_or(mp_preapproval_id not like ${PREFIXO_LIBERACAO_MANUAL + '%'})`.as('mp'),
-      sql<string | null>`(max(periodo_referencia) filter (where mp_preapproval_id like ${PREFIXO_LIBERACAO_MANUAL + '%'}))::text`.as('ultimoManual'),
+      sql<boolean>`bool_or(not (mp_preapproval_id like ${MANUAL} or mp_preapproval_id like ${AVULSO}))`.as('mp'),
+      sql<string | null>`(max(periodo_referencia) filter (where mp_preapproval_id like ${MANUAL} or mp_preapproval_id like ${AVULSO}))::text`.as('ultimoManual'),
     ])
     .where('organizacao_id', 'in', organizacaoIds)
     .where('status', '=', 'aprovado')
@@ -54,17 +58,17 @@ export async function expirarLiberacoesManuais(): Promise<number> {
       and exists (
         select 1 from assinaturas a
         where a.organizacao_id = o.id and a.status = 'aprovado'
-          and a.mp_preapproval_id like ${PREFIXO_LIBERACAO_MANUAL + '%'}
+          and (a.mp_preapproval_id like ${MANUAL} or a.mp_preapproval_id like ${AVULSO})
       )
       and not exists (
         select 1 from assinaturas a
         where a.organizacao_id = o.id and a.status = 'aprovado'
-          and a.mp_preapproval_id not like ${PREFIXO_LIBERACAO_MANUAL + '%'}
+          and not (a.mp_preapproval_id like ${MANUAL} or a.mp_preapproval_id like ${AVULSO})
       )
       and not exists (
         select 1 from assinaturas a
         where a.organizacao_id = o.id and a.status = 'aprovado'
-          and a.mp_preapproval_id like ${PREFIXO_LIBERACAO_MANUAL + '%'}
+          and (a.mp_preapproval_id like ${MANUAL} or a.mp_preapproval_id like ${AVULSO})
           and (a.periodo_referencia + interval '1 month')::date > (now() at time zone 'America/Sao_Paulo')::date
       )
   `.execute(db);

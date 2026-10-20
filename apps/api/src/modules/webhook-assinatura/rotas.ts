@@ -1,16 +1,45 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { derivarStatusOrganizacao } from '@resenha05/shared';
 import { db } from '../../db/index.js';
-import { buscarPreapproval } from '../../lib/mercadopago-preapproval.js';
+import { buscarPreapproval, MercadoPagoErro } from '../../lib/mercadopago-preapproval.js';
 import { decifrarToken } from '../../lib/cripto.js';
 import { processarPreapproval } from './processar.js';
 import { autenticarWebhook } from './autenticar.js';
+import { conferirPagamentoAvulso, tokenDaPlataforma } from '../../lib/pagamento-avulso.js';
 
 export const rotasWebhookAssinatura: FastifyPluginAsync = async (app) => {
   app.post('/webhooks/mercadopago/assinatura', async (req, reply) => {
-    const query = req.query as { 'data.id'?: string };
+    const query = req.query as { 'data.id'?: string; topic?: string; id?: string; type?: string };
     const body = (req.body ?? {}) as { type?: string; data?: { id?: string } };
     const dataId = query['data.id'] ?? body.data?.id;
+
+    // Pagamento avulso (Pix/cartão sem conta): não confiamos no que veio na notificação —
+    // o pagamento é reconsultado no Mercado Pago com a nossa credencial antes de liberar o mês.
+    const ehPagamento = body.type === 'payment' || query.type === 'payment' || query.topic === 'payment';
+    if (ehPagamento) {
+      const pagamentoId = String(dataId ?? query.id ?? '');
+      if (/^\d{5,20}$/.test(pagamentoId)) {
+        try {
+          const token = await tokenDaPlataforma();
+          if (token) {
+            const r = await conferirPagamentoAvulso(token, pagamentoId);
+            req.log.info({ pagamentoId, decisao: r.decisao }, 'Notificação de pagamento avulso processada');
+          }
+        } catch (e) {
+          // Pagamento que o Mercado Pago não conhece (404): nada a fazer, e reenviar não adianta.
+          if (e instanceof MercadoPagoErro && e.status === 404) {
+            reply.code(200);
+            return { ok: true };
+          }
+          // Outra falha ao consultar: pede o reenvio (o MP tenta de novo) em vez de perder o pagamento.
+          req.log.error({ err: e, pagamentoId }, 'Falha ao processar notificação de pagamento');
+          reply.code(500);
+          return { erro: 'Não foi possível processar agora.' };
+        }
+      }
+      reply.code(200);
+      return { ok: true };
+    }
 
     if (!dataId || body.type !== 'subscription_preapproval') {
       // Evento que não é de preapproval (ex: teste do painel) — confirma

@@ -1,10 +1,9 @@
 import type { AssinaturaDiagnostico, ContaDiagnostico, PagamentoDiagnostico } from '@resenha05/shared';
+import { mpApi } from './mercadopago-base.js';
 import { erroDoMp } from './mercadopago-preapproval.js';
 
-const BASE = 'https://api.mercadopago.com';
-
 async function obter(accessToken: string, caminho: string, fetchFn: typeof fetch): Promise<Record<string, unknown>> {
-  const resp = await fetchFn(`${BASE}${caminho}`, { headers: { Authorization: `Bearer ${accessToken}` } });
+  const resp = await fetchFn(`${mpApi()}${caminho}`, { headers: { Authorization: `Bearer ${accessToken}` } });
   if (!resp.ok) throw await erroDoMp(resp);
   return (await resp.json()) as Record<string, unknown>;
 }
@@ -65,6 +64,7 @@ export interface PagamentoDetalhado extends PagamentoDiagnostico {
   meio: string | null;
   valor: number | null;
   criadoEm: string | null;
+  externalReference: string | null;
 }
 
 /** Uma operação (o "#" que o Mercado Pago mostra na tela de recusa). */
@@ -82,7 +82,8 @@ export async function consultarPagamentoDetalhado(
     payerId: texto(pagador.id),
     payerEmail: texto(pagador.email),
     meio: texto(j.payment_method_id),
-    valor: typeof j.transaction_amount === 'number' ? j.transaction_amount : null,
+    valor: typeof j.transaction_amount === 'number' ? j.transaction_amount : Number(j.transaction_amount) || null,
     criadoEm: texto(j.date_created),
+    externalReference: texto(j.external_reference),
   };
 }

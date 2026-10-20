@@ -3,6 +3,7 @@ import { sql } from 'kysely';
 import {
   interpretarDiagnosticoMp,
   PREFIXO_LIBERACAO_MANUAL,
+  PREFIXO_PAGAMENTO_AVULSO,
   idLiberacaoManual,
   proximoMesALiberar,
   fimDoMes,
@@ -335,6 +336,7 @@ export const rotasAdminPlataforma: FastifyPluginAsync = async (app) => {
         'o.nome as organizacao',
       ])
       .where('a.mp_preapproval_id', 'not like', `${PREFIXO_LIBERACAO_MANUAL}%`)
+      .where('a.mp_preapproval_id', 'not like', `${PREFIXO_PAGAMENTO_AVULSO}%`)
       .orderBy('a.criado_em', 'desc')
       .executeTakeFirst();
 

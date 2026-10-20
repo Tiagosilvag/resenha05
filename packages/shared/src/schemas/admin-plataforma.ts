@@ -31,3 +31,8 @@ export const iniciarCheckoutSchema = z.object({
 export const configurarWebhookSecretSchema = z.object({
   webhookSecret: z.string().trim().min(10, 'Segredo muito curto.').max(200),
 });
+
+/** Número do pagamento (payment_id) que o Mercado Pago devolve na volta ao site. */
+export const confirmarPagamentoAvulsoSchema = z.object({
+  paymentId: z.string().trim().regex(/^\d{5,20}$/, 'Número de pagamento inválido.'),
+});
