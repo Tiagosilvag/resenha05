@@ -1,0 +1,10 @@
+{
+  "name": "resenha05-verificacao",
+  "private": true,
+  "description": "Banco em memória (PGlite) e Mercado Pago de mentira para verificar o app ponta a ponta, localmente.",
+  "type": "module",
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.10",
+    "@electric-sql/pglite-socket": "^0.2.13"
+  }
+}
