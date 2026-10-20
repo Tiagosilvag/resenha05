@@ -19,7 +19,7 @@ quebram no Git Bash (use arquivos/Write).
 
 ## Fase 0 — Publicar o que está pronto  *(depende do "pode fazer" do dono)*
 
-- [ ] **0.1 Publicar por cherry-pick seletivo** (deixa `27e5123` de fora):
+- [x] **0.1 Publicar por cherry-pick seletivo** (deixa `27e5123`/`7c3345b` de fora):
   ```bash
   git fetch origin
   git switch -c entrega-pagamentos origin/main
@@ -29,11 +29,18 @@ quebram no Git Bash (use arquivos/Write).
   git switch main && git rebase origin/main && git branch -D entrega-pagamentos
   ```
   Aceite: `git log origin/main` contém os commits; `git status` limpo (sem `27e5123` publicado).
-- [ ] **0.2 Deploy** pelo MCP do Coolify: `deploy` com `uuid=hkiv7ifyqlc7fm5b5xsyugq6`, depois
+  **Confirmado em 20/10 (sessão nova):** `origin/main` termina em `ce6e210` (commit deste plano) e já
+  inclui todo o conteúdo listado acima sob hashes novos (cherry-pick recria hash); nenhum commit com a
+  descrição do `27e5123`/`7c3345b` (webhook monta manifesto) está em `origin/main`.
+- [x] **0.2 Deploy** pelo MCP do Coolify: `deploy` com `uuid=hkiv7ifyqlc7fm5b5xsyugq6`, depois
   `get_deployment` até `finished`. A **migration `0016`** roda sozinha no start do container.
   Aceite: bundle do site contém "Pagamento dos jogadores"; `POST /api/organizacoes/:id/assinatura/avulso`
   sem token devolve 401 (não 404). (O MCP não mostra o log da migration — se quiser a mensagem
   "applied", ver no painel do Coolify.)
+  **Confirmado em 20/10:** deploy `ua0xhkv7oioqf7kufhrbnqlf`, commit `ce6e210`, status `finished`
+  (04:50 UTC). Smoke test via curl: `GET /api/health` → 200; `POST /api/organizacoes/<uuid>/assinatura/avulso`
+  sem token → **401** `nao_autorizado` (não 404) — migration 0016 aplicada (senão a API não subiria,
+  como já visto nesta aplicação). Não abri as telas no navegador (isso é a 0.3, ainda em aberto).
 - [ ] **0.3 Smoke test em produção** (o dono ou o agente com login): abrir `/org/:id/assinatura` (card
   "Sem conta no Mercado Pago?"), `/org/:id/mercadopago` (3 modos) e uma pelada com valor (card "Pagamento").
 - [ ] **0.4 Voltar a mensalidade ao valor real** (Administração → Configurações) — está em R$ 1/R$ 5 de teste.
