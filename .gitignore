@@ -31,4 +31,5 @@ apps/web/.capacitor/
 
 # Fotos de perfil (dev)
 apps/api/uploads/
+/uploads/
 __pycache__/
