@@ -39,3 +39,4 @@ export interface OrganizacaoDoUsuario {
   statusAssinatura: StatusAssinatura;
 }
 export * from './partida.js';
+export * from './diagnostico-mp.js';

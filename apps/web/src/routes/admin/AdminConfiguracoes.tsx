@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../../lib/api';
 import { formatarCentavos } from '../../lib/dinheiro';
 import { Aviso, Button, Card, Input, Spinner } from '../../components/ui';
+import { AdminDiagnosticoMp } from './AdminDiagnosticoMp';
 
 interface Configuracoes {
   mensalidadeValorCentavos: number;
@@ -176,6 +177,8 @@ export function AdminConfiguracoes() {
           </Button>
         </form>
       </Card>
+
+      <AdminDiagnosticoMp />
     </div>
   );
 }

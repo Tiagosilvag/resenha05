@@ -1,6 +1,8 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { sql } from 'kysely';
 import {
+  interpretarDiagnosticoMp,
+  PREFIXO_LIBERACAO_MANUAL,
   idLiberacaoManual,
   proximoMesALiberar,
   fimDoMes,
@@ -13,9 +15,14 @@ import { db } from '../../db/index.js';
 import { exigirAdminPlataforma, exigirDev } from '../../plugins/auth.js';
 import { validar } from '../../lib/validar.js';
 import { erro } from '../../lib/erros.js';
-import { cifrarTokenOuErro } from '../../lib/cripto.js';
+import { cifrarTokenOuErro, decifrarToken } from '../../lib/cripto.js';
 import { consultarConta } from '../../lib/mercadopago-conta.js';
 import { MercadoPagoErro } from '../../lib/mercadopago-preapproval.js';
+import {
+  consultarAssinaturaDetalhada,
+  consultarContaDetalhada,
+  consultarPagamentoDetalhado,
+} from '../../lib/mercadopago-diagnostico.js';
 import {
   expirarLiberacoesManuais,
   situacaoDasLiberacoes,
@@ -288,6 +295,75 @@ export const rotasAdminPlataforma: FastifyPluginAsync = async (app) => {
       .where('id', '=', 1)
       .execute();
     return { ok: true, conta: conta.ehTeste ? 'teste' : 'real' };
+  });
+
+  // Diagnóstico de cobrança: pergunta ao Mercado Pago pela conta vendedora, pela
+  // última assinatura criada e, se informado, pela operação (o "#" da tela de recusa).
+  app.get('/admin/diagnostico-mp', async (req) => {
+    const operacao = ((req.query as { operacao?: string }).operacao ?? '').trim();
+    if (operacao && !/^\d{5,20}$/.test(operacao)) {
+      throw erro.invalido('O número da operação tem só dígitos (ex.: 184064324217).');
+    }
+
+    const cfg = await db
+      .selectFrom('plataforma_config')
+      .select(['mp_geral_token_cipher', 'mp_geral_token_nonce'])
+      .where('id', '=', 1)
+      .executeTakeFirstOrThrow();
+    if (!cfg.mp_geral_token_cipher || !cfg.mp_geral_token_nonce) {
+      throw erro.invalido('Conecte a conta do Mercado Pago em Configurações antes de diagnosticar.');
+    }
+    const token = decifrarToken(cfg.mp_geral_token_cipher, cfg.mp_geral_token_nonce);
+    const msg = (e: unknown) =>
+      e instanceof MercadoPagoErro ? `${e.message} (HTTP ${e.status})` : e instanceof Error ? e.message : String(e);
+
+    let conta;
+    try {
+      conta = await consultarContaDetalhada(token);
+    } catch (e) {
+      throw erro.invalido(`O Mercado Pago não aceitou a credencial salva: ${msg(e)}`);
+    }
+
+    const ultima = await db
+      .selectFrom('assinaturas as a')
+      .innerJoin('organizacoes as o', 'o.id', 'a.organizacao_id')
+      .select([
+        'a.mp_preapproval_id as preapprovalId',
+        'a.status as statusLocal',
+        'a.criado_em as criadoEm',
+        'a.valor_centavos as valorCentavos',
+        'o.nome as organizacao',
+      ])
+      .where('a.mp_preapproval_id', 'not like', `${PREFIXO_LIBERACAO_MANUAL}%`)
+      .orderBy('a.criado_em', 'desc')
+      .executeTakeFirst();
+
+    let assinatura = null;
+    let erroAssinatura: string | null = null;
+    if (ultima) {
+      try {
+        assinatura = await consultarAssinaturaDetalhada(token, ultima.preapprovalId);
+      } catch (e) {
+        erroAssinatura = msg(e);
+      }
+    }
+
+    let pagamento = null;
+    let erroPagamento: string | null = null;
+    if (operacao) {
+      try {
+        pagamento = await consultarPagamentoDetalhado(token, operacao);
+      } catch (e) {
+        erroPagamento = msg(e);
+      }
+    }
+
+    return {
+      conta,
+      ultimaAssinatura: ultima ? { ...ultima, mp: assinatura, erro: erroAssinatura } : null,
+      pagamento: operacao ? { operacao, mp: pagamento, erro: erroPagamento } : null,
+      achados: interpretarDiagnosticoMp({ conta, assinatura, pagamento }),
+    };
   });
 
   app.post('/admin/mercadopago/webhook-secret', async (req) => {
