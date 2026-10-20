@@ -123,6 +123,10 @@ export const rotasPeladas: FastifyPluginAsync = async (app) => {
       exigirOrganizacaoLiberada(org.status_assinatura);
 
       const d = validar(criarConfiguracaoSchema, req.body);
+      // O valor da pelada é dinheiro do jogador pra organização — só o dono
+      // (admin_principal) configura, mesmo que um admin comum possa criar a
+      // configuração em si (dia/horário/local).
+      if (d.valorPadrao !== undefined) exigirDono(req, id);
       const c = await db
         .insertInto('pelada_configuracoes')
         .values({
@@ -146,6 +150,7 @@ export const rotasPeladas: FastifyPluginAsync = async (app) => {
       const orgId = await orgDaConfig(configId);
       exigirAdmin(req, orgId);
       const d = validar(criarConfiguracaoSchema.partial(), req.body);
+      if (d.valorPadrao !== undefined) exigirDono(req, orgId);
       await db
         .updateTable('pelada_configuracoes')
         .set({
