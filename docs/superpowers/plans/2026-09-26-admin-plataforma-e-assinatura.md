@@ -1,5 +1,9 @@
 # Admin de Plataforma + Assinatura Mensal Implementation Plan
 
+> **Status: CONCLUÍDO** (entregue e em produção desde outubro/2026). Para o que veio depois e o que falta, ver
+> [`2026-10-20-pagamentos-e-proximos-passos.md`](2026-10-20-pagamentos-e-proximos-passos.md) e
+> [`docs/historico-sessao-2026-10.md`](../../historico-sessao-2026-10.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Dar à plataforma um admin acima das organizações (papel dev + admins de plataforma), uma conta Mercado Pago geral, e um ciclo de assinatura mensal que libera ou bloqueia uma organização.
