@@ -19,6 +19,10 @@ export const cadastrarAdminPlataformaSchema = z.object({
   profileId: z.string().uuid(),
 });
 
+export const trocarDonoOrganizacaoSchema = z.object({
+  profileId: z.string().uuid(),
+});
+
 /**
  * O Mercado Pago só cria a assinatura se o e-mail do pagador for de uma conta
  * dele do mesmo tipo (teste ou real) que a conta vendedora — então o dono
