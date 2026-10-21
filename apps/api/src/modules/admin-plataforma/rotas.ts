@@ -8,6 +8,7 @@ import {
   proximoMesALiberar,
   fimDoMes,
   cadastrarAdminPlataformaSchema,
+  trocarDonoOrganizacaoSchema,
   configurarMensalidadeSchema,
   conectarMercadoPagoGeralSchema,
   configurarWebhookSecretSchema,
@@ -192,6 +193,57 @@ export const rotasAdminPlataforma: FastifyPluginAsync = async (app) => {
       mercadoPagoDaOrganizacaoConectado: org.mpAtualizadoEm != null,
       assinaturas,
     };
+  });
+
+  // Troca o dono (admin_principal) da organização. O antigo dono continua como
+  // admin (ou jogador, se a organização já tem 5 admins); o novo vira membro
+  // ativo e admin_principal.
+  app.put('/admin/organizacoes/:id/dono', async (req) => {
+    const { id } = req.params as { id: string };
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+      throw erro.naoEncontrado('Organização não encontrada.');
+    }
+    const { profileId } = validar(trocarDonoOrganizacaoSchema, req.body);
+
+    await db.transaction().execute(async (tx) => {
+      const org = await tx
+        .selectFrom('organizacoes')
+        .select(['id', 'dono_id'])
+        .where('id', '=', id)
+        .forUpdate()
+        .executeTakeFirst();
+      if (!org) throw erro.naoEncontrado('Organização não encontrada.');
+      if (org.dono_id === profileId) throw erro.conflito('Essa pessoa já é a dona da organização.');
+
+      const novo = await tx.selectFrom('profiles').select('id').where('id', '=', profileId).executeTakeFirst();
+      if (!novo) throw erro.naoEncontrado('Perfil não encontrado.');
+
+      // Libera a vaga de admin_principal antes de ocupá-la (trigger de 1 por organização).
+      const { admins } = await tx
+        .selectFrom('organizacao_membros')
+        .select(db.fn.countAll<string>().as('admins'))
+        .where('organizacao_id', '=', id)
+        .where('papel', '=', 'admin')
+        .where('ativo', '=', true)
+        .where('profile_id', '!=', profileId)
+        .executeTakeFirstOrThrow();
+      await tx
+        .updateTable('organizacao_membros')
+        .set({ papel: Number(admins) < 5 ? 'admin' : 'jogador' })
+        .where('organizacao_id', '=', id)
+        .where('papel', '=', 'admin_principal')
+        .execute();
+
+      await tx
+        .insertInto('organizacao_membros')
+        .values({ organizacao_id: id, profile_id: profileId, papel: 'admin_principal' })
+        .onConflict((oc) =>
+          oc.columns(['organizacao_id', 'profile_id']).doUpdateSet({ papel: 'admin_principal', ativo: true }),
+        )
+        .execute();
+      await tx.updateTable('organizacoes').set({ dono_id: profileId }).where('id', '=', id).execute();
+    });
+    return { ok: true };
   });
 
   // Admin da plataforma libera um mês da mensalidade sem passar pelo Mercado

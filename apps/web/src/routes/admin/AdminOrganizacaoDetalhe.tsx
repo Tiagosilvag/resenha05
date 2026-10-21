@@ -49,6 +49,76 @@ export function dataBr(dataIso: string): string {
   return `${dia}/${mes}/${ano}`;
 }
 
+interface Participante {
+  profileId: string;
+  nome: string | null;
+  telefone: string;
+}
+
+function TrocarDono({ orgId, orgNome, donoId }: { orgId: string; orgNome: string; donoId: string }) {
+  const qc = useQueryClient();
+  const [aberto, setAberto] = useState(false);
+  const [busca, setBusca] = useState('');
+  const [erro, setErro] = useState<string | null>(null);
+  const q = busca.trim();
+  const { data } = useQuery({
+    queryKey: ['admin-participantes', q],
+    queryFn: () => api<Participante[]>(`/admin/participantes?q=${encodeURIComponent(q)}`),
+    enabled: aberto && q.length >= 2,
+  });
+  const trocar = useMutation({
+    mutationFn: (profileId: string) =>
+      api(`/admin/organizacoes/${orgId}/dono`, { method: 'PUT', json: { profileId } }),
+    onSuccess: () => {
+      setErro(null);
+      setAberto(false);
+      setBusca('');
+      qc.invalidateQueries({ queryKey: ['admin-organizacao', orgId] });
+    },
+    onError: (e) => setErro(e instanceof ApiError ? e.message : 'Não foi possível trocar o dono.'),
+  });
+
+  if (!aberto) {
+    return (
+      <Button variante="secundario" className="mt-2 w-full" onClick={() => setAberto(true)}>
+        Trocar dono
+      </Button>
+    );
+  }
+  return (
+    <div className="mt-2 flex flex-col gap-2">
+      <input
+        className="w-full rounded-lg border border-tinta-line px-3 py-2 text-sm"
+        placeholder="Buscar novo dono por nome ou telefone"
+        value={busca}
+        onChange={(e) => setBusca(e.target.value)}
+        autoFocus
+      />
+      {erro && <Aviso tipo="erro">{erro}</Aviso>}
+      {(data ?? [])
+        .filter((p) => p.profileId !== donoId)
+        .map((p) => (
+          <button
+            key={p.profileId}
+            type="button"
+            disabled={trocar.isPending}
+            className="rounded-lg border border-tinta-line/60 px-3 py-2 text-left"
+            onClick={() => {
+              if (!confirm(`Tornar ${p.nome ?? 'esta pessoa'} a dona de "${orgNome}"? O dono atual passa a admin.`)) return;
+              trocar.mutate(p.profileId);
+            }}
+          >
+            <span className="block text-sm font-semibold">{p.nome ?? 'Sem nome'}</span>
+            <span className="block text-xs text-tinta-faint">{formatarTelefone(p.telefone)}</span>
+          </button>
+        ))}
+      <Button variante="secundario" onClick={() => setAberto(false)}>
+        Cancelar
+      </Button>
+    </div>
+  );
+}
+
 export function AdminOrganizacaoDetalhe({ id }: { id: string }) {
   const qc = useQueryClient();
   const [erro, setErro] = useState<string | null>(null);
@@ -78,6 +148,7 @@ export function AdminOrganizacaoDetalhe({ id }: { id: string }) {
         <p className="eyebrow mb-0.5">Dono</p>
         <p className="text-sm font-semibold">{data.dono.nome ?? 'Sem nome'}</p>
         <p className="text-xs text-tinta-faint">{formatarTelefone(data.dono.telefone)}</p>
+        <TrocarDono orgId={id} orgNome={data.nome} donoId={data.dono.profileId} />
       </div>
 
       <div className="grid grid-cols-4 gap-2">
