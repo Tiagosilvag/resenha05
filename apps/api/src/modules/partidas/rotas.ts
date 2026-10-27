@@ -8,6 +8,7 @@ import {
   encerrarPartidaSchema,
   filaDeEspera,
   golPartidaSchema,
+  corrigirGolSchema,
   instanteDoFimPorTempo,
   moverNaRedistribuicaoSchema,
   redistribuirPerdedor,
@@ -921,6 +922,61 @@ export const rotasPartidas: FastifyPluginAsync = async (app) => {
         .execute();
       return { redistribuicao: resumo };
     });
+  });
+
+  // Gols de uma pelada (inclusive de partidas já concluídas) com quem poderia
+  // ter feito cada um, para o admin corrigir um gol lançado no jogador errado.
+  app.get('/peladas/:peladaId/gols', async (req) => {
+    const { peladaId } = req.params as { peladaId: string };
+    const pelada = await peladaComOrg(peladaId);
+    exigirAdmin(req, pelada.organizacao_id);
+    const partidas = await montarPartidas(peladaId, new Date());
+    return {
+      gols: partidas.flatMap((p, i) =>
+        p.gols.map((g) => ({
+          id: g.id,
+          jogoId: p.id,
+          partida: `${i + 1}ª partida: ${p.timeA.nome} ${p.placarA} × ${p.placarB} ${p.timeB.nome}`,
+          timeNome: g.timeId === p.timeA.id ? p.timeA.nome : p.timeB.nome,
+          profileId: g.profileId,
+          nome: g.nome,
+          criadoEm: g.criadoEm,
+          jogadores: p.jogadores
+            .filter((j) => j.timeId === g.timeId)
+            .map((j) => ({ profileId: j.profileId, nome: j.nome })),
+        })),
+      ),
+    };
+  });
+
+  // Troca o autor de um gol, mesmo em partida concluída: o placar não muda.
+  app.patch('/partidas/:jogoId/gols/:eventoId', async (req) => {
+    const { jogoId, eventoId } = req.params as { jogoId: string; eventoId: string };
+    const { orgId } = await orgDaPartida(jogoId);
+    exigirAdmin(req, orgId);
+    const { profileId } = validar(corrigirGolSchema, req.body);
+
+    await comPartida(jogoId, async (tx, jogo) => {
+      const gol = await tx
+        .selectFrom('sumula_eventos')
+        .select('time_pelada_id')
+        .where('id', '=', eventoId)
+        .where('jogo_id', '=', jogo.id)
+        .where('tipo', '=', 'gol')
+        .where('removido_em', 'is', null)
+        .executeTakeFirst();
+      if (!gol?.time_pelada_id) throw erro.naoEncontrado('Gol não encontrado.');
+      const joga = await tx
+        .selectFrom('partida_jogadores')
+        .select('profile_id')
+        .where('jogo_id', '=', jogo.id)
+        .where('time_id', '=', gol.time_pelada_id)
+        .where('profile_id', '=', profileId)
+        .executeTakeFirst();
+      if (!joga) throw erro.invalido('Esse jogador não jogou pelo time que marcou.');
+      await tx.updateTable('sumula_eventos').set({ profile_id: profileId }).where('id', '=', eventoId).execute();
+    });
+    return { ok: true };
   });
 
   app.get('/peladas/:peladaId/artilharia', async (req) => {

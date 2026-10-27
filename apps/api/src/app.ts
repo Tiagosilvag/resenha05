@@ -37,6 +37,7 @@ export async function construirApp() {
   await app.register(sensible);
   await app.register(cors, {
     origin: env.NODE_ENV === 'development' ? true : env.WEB_ORIGIN,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
     credentials: true,
   });
   await app.register(multipart, { limits: { files: 1, fileSize: 6 * 1024 * 1024 } });

@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { ehTelefoneDev, type SessaoUsuario } from '@resenha05/shared';
+import { sql } from 'kysely';
 import { db } from '../db/index.js';
 import { env } from '../env.js';
 import { sha256 } from './cripto.js';
@@ -42,6 +43,25 @@ export async function carregarUsuario(profileId: string): Promise<SessaoUsuario>
     .execute();
 
   const papelPlataforma = await resolverPapelPlataforma(p.telefone, profileId);
+
+  // Admin da plataforma administra qualquer organização, mesmo sem ser membro.
+  if (papelPlataforma) {
+    const minhas = new Set(orgs.map((o) => o.id));
+    const todas = await db
+      .selectFrom('organizacoes as o')
+      .select([
+        'o.id as id',
+        'o.nome as nome',
+        'o.codigo as codigo',
+        sql<'admin'>`'admin'`.as('papel'),
+        sql<number>`0`.as('estrelas'),
+        'o.status_assinatura as statusAssinatura',
+      ])
+      .orderBy('o.nome')
+      .execute();
+    orgs.push(...todas.filter((o) => !minhas.has(o.id)));
+    orgs.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  }
 
   return {
     id: p.id,
