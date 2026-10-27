@@ -372,8 +372,11 @@ function NovaPartida({
   ocupado: boolean;
   onCriar: (a: string, b: string) => void;
 }) {
-  const [a, setA] = useState(sugestao?.timeAId ?? times[0]?.id ?? '');
-  const [b, setB] = useState(sugestao?.timeBId ?? times[1]?.id ?? '');
+  const [escolhaA, setA] = useState(sugestao?.timeAId ?? times[0]?.id ?? '');
+  const [escolhaB, setB] = useState(sugestao?.timeBId ?? times[1]?.id ?? '');
+  // Depois de um novo sorteio os ids antigos não existem mais: cai nos primeiros times.
+  const a = times.some((t) => t.id === escolhaA) ? escolhaA : (times[0]?.id ?? '');
+  const b = times.some((t) => t.id === escolhaB) ? escolhaB : (times[1]?.id ?? '');
   // Se a sugestão muda (depois de concluir uma partida), acompanha.
   useEffect(() => {
     if (sugestao) {
