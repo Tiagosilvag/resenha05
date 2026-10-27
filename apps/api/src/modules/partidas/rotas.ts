@@ -9,6 +9,7 @@ import {
   filaDeEspera,
   golPartidaSchema,
   instanteDoFimPorTempo,
+  moverNaRedistribuicaoSchema,
   redistribuirPerdedor,
   regrasPartidaSchema,
   resultadoDaPartida,
@@ -339,6 +340,48 @@ async function partidaAberta(peladaId: string, d: typeof db | Tx = db) {
     .executeTakeFirst();
 }
 
+/** Os dois times da última redistribuição automática da pelada (null se nenhuma ainda). */
+async function ultimaRedistribuicao(
+  peladaId: string,
+  d: typeof db | Tx = db,
+): Promise<{ perdedorTimeId: string; sobraTimeId: string } | null> {
+  const j = await d
+    .selectFrom('jogos')
+    .select('redistribuicao')
+    .where('pelada_id', '=', peladaId)
+    .where('concluido_em', 'is not', null)
+    .where('redistribuicao', 'is not', null)
+    .orderBy('concluido_em', 'desc')
+    .executeTakeFirst();
+  const r = j?.redistribuicao as { perdedorTimeId?: string; sobraTimeId?: string } | undefined;
+  if (!r?.perdedorTimeId || !r?.sobraTimeId) return null;
+  return { perdedorTimeId: r.perdedorTimeId, sobraTimeId: r.sobraTimeId };
+}
+
+/**
+ * O par (time incompleto, outro time envolvido na última redistribuição
+ * automática) pro ajuste manual — sempre que o time incompleto de agora é um
+ * dos dois lados daquela redistribuição. null quando não há isso (ninguém
+ * incompleto, nenhuma redistribuição ainda, ou o time incompleto mudou por
+ * outro motivo desde então).
+ */
+function paraAjusteRedistribuicao(
+  times: TimeAtual[],
+  porTime: number,
+  ultima: { perdedorTimeId: string; sobraTimeId: string } | null,
+): { incompletoTimeId: string; outroTimeId: string } | null {
+  const incompleto = times.find((t) => t.jogadores.length < porTime);
+  if (!incompleto || !ultima) return null;
+  const outroId =
+    incompleto.id === ultima.perdedorTimeId
+      ? ultima.sobraTimeId
+      : incompleto.id === ultima.sobraTimeId
+        ? ultima.perdedorTimeId
+        : null;
+  if (!outroId || !times.some((t) => t.id === outroId)) return null;
+  return { incompletoTimeId: incompleto.id, outroTimeId: outroId };
+}
+
 export const rotasPartidas: FastifyPluginAsync = async (app) => {
   app.addHook('preHandler', app.autenticar);
 
@@ -385,6 +428,8 @@ export const rotasPartidas: FastifyPluginAsync = async (app) => {
         )
       : [];
 
+    const ajusteRedistribuicao = paraAjusteRedistribuicao(times, porTime, await ultimaRedistribuicao(peladaId));
+
     return {
       souAdmin,
       agora: agora.toISOString(),
@@ -396,6 +441,7 @@ export const rotasPartidas: FastifyPluginAsync = async (app) => {
       porTime,
       partidas,
       sugestao,
+      ajusteRedistribuicao,
       artilharia: await artilhariaDaPelada(peladaId),
     };
   });
@@ -413,6 +459,48 @@ export const rotasPartidas: FastifyPluginAsync = async (app) => {
       .updateTable('peladas')
       .set({ partida_duracao_min: d.duracaoMin, partida_gols_limite: d.golsLimite })
       .where('id', '=', peladaId)
+      .execute();
+    return { ok: true };
+  });
+
+  // Ajuste manual entre o time incompleto e o outro time da última
+  // redistribuição automática — sempre disponível, inclusive pra sobrescrever
+  // o que /concluir já decidiu. O destino é sempre o outro time do par; a
+  // rota decide sozinha pra qual lado vai, a partir de onde o jogador está agora.
+  app.post('/peladas/:peladaId/times/mover', async (req) => {
+    const { peladaId } = req.params as { peladaId: string };
+    const pelada = await peladaComOrg(peladaId);
+    exigirAdmin(req, pelada.organizacao_id);
+    const { profileId } = validar(moverNaRedistribuicaoSchema, req.body);
+
+    const sorteio = await ultimoSorteio(peladaId);
+    if (!sorteio) throw erro.naoEncontrado('Esta pelada ainda não teve sorteio.');
+
+    const times = await timesDoSorteio(sorteio.id);
+    const porTime = Math.max(0, ...times.map((t) => t.jogadores.length));
+    const ajuste = paraAjusteRedistribuicao(times, porTime, await ultimaRedistribuicao(peladaId));
+    if (!ajuste) throw erro.invalido('Não há um ajuste de redistribuição disponível agora.');
+
+    const incompleto = times.find((t) => t.id === ajuste.incompletoTimeId)!;
+    const outro = times.find((t) => t.id === ajuste.outroTimeId)!;
+    const origem = incompleto.jogadores.some((j) => j.profileId === profileId)
+      ? incompleto
+      : outro.jogadores.some((j) => j.profileId === profileId)
+        ? outro
+        : null;
+    if (!origem) {
+      throw erro.invalido('Esse jogador não está em nenhum dos dois times do ajuste.');
+    }
+    const destino = origem.id === incompleto.id ? outro : incompleto;
+    if (destino.id === incompleto.id && destino.jogadores.length >= porTime) {
+      throw erro.conflito('O time incompleto já está completo.');
+    }
+
+    await db
+      .updateTable('time_jogadores')
+      .set({ time_id: destino.id })
+      .where('time_id', '=', origem.id)
+      .where('profile_id', '=', profileId)
       .execute();
     return { ok: true };
   });

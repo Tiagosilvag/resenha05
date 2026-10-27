@@ -113,6 +113,16 @@ export const concluirPartidaSchema = z.object({
   perdedorTimeId: z.string().uuid().nullable(),
 });
 
+/**
+ * Ajuste manual entre o time incompleto e o outro time da última
+ * redistribuição automática — sempre disponível, inclusive pra sobrescrever
+ * o que /concluir já decidiu. O destino é sempre o outro time do par; não
+ * precisa informar.
+ */
+export const moverNaRedistribuicaoSchema = z.object({
+  profileId: z.string().uuid(),
+});
+
 /** Troca durante a partida; `voltaAJogar` false = quem saiu não joga mais hoje (lesão). */
 export const substituirJogadorSchema = z
   .object({

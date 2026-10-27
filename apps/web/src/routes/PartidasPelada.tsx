@@ -74,6 +74,7 @@ interface Resp {
   porTime: number;
   partidas: Partida[];
   sugestao: { timeAId: string; timeBId: string } | null;
+  ajusteRedistribuicao: { incompletoTimeId: string; outroTimeId: string } | null;
   artilharia: { profileId: string; nome: string | null; fotoUrl: string | null; fotoRecortada: boolean; gols: number }[];
 }
 
@@ -230,6 +231,18 @@ export function PartidasPelada() {
           )}
 
           <TimesDeAgora times={times} porTime={data.porTime} />
+
+          {souAdmin && data.ajusteRedistribuicao && (
+            <AjustarRedistribuicao
+              times={times}
+              porTime={data.porTime}
+              ajuste={data.ajusteRedistribuicao}
+              ocupado={acao.isPending}
+              onMover={(profileId) =>
+                acao.mutate({ caminho: `/peladas/${peladaId}/times/mover`, json: { profileId } })
+              }
+            />
+          )}
 
           {historico.length > 0 && (
             <section>
@@ -927,6 +940,83 @@ function SubstituirModal({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Ajuste manual entre o time incompleto e quem perdeu por último — sempre
+ * disponível (não só quando a redistribuição automática falha), pra poder
+ * sobrescrever quem subiu, ou completar na mão quando ela não rolou.
+ */
+function AjustarRedistribuicao({
+  times,
+  porTime,
+  ajuste,
+  ocupado,
+  onMover,
+}: {
+  times: TimeAtual[];
+  porTime: number;
+  ajuste: { incompletoTimeId: string; outroTimeId: string };
+  ocupado: boolean;
+  onMover: (profileId: string) => void;
+}) {
+  const incompleto = times.find((t) => t.id === ajuste.incompletoTimeId);
+  const outro = times.find((t) => t.id === ajuste.outroTimeId);
+  if (!incompleto || !outro) return null;
+  const cheio = incompleto.jogadores.length >= porTime;
+
+  return (
+    <Card as="section">
+      <Eyebrow>Ajustar time incompleto</Eyebrow>
+      <p className="-mt-1 text-sm text-tinta-soft">
+        {incompleto.nome} está faltando {porTime - incompleto.jogadores.length} jogador(es). Suba quem quiser de{' '}
+        {outro.nome} — ou devolva alguém pra lá, mesmo que a redistribuição automática já tenha decidido diferente.
+      </p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div>
+          <p className="eyebrow mb-1.5">
+            {incompleto.nome} ({incompleto.jogadores.length}/{porTime})
+          </p>
+          {incompleto.jogadores.length === 0 ? (
+            <p className="text-sm text-tinta-faint">Ninguém ainda.</p>
+          ) : (
+            <ul className="divide-y divide-tinta-line/50 overflow-hidden rounded-xl border border-tinta-line/70 text-sm">
+              {incompleto.jogadores.map((j) => (
+                <li key={j.profileId} className="flex items-center justify-between gap-2 px-3 py-2">
+                  <span className="min-w-0 truncate">{j.nome ?? 'Jogador'}</span>
+                  <Button
+                    variante="secundario"
+                    className="shrink-0 !px-3 !py-1.5 !text-[0.8rem]"
+                    disabled={ocupado}
+                    onClick={() => onMover(j.profileId)}
+                  >
+                    Devolver
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div>
+          <p className="eyebrow mb-1.5">{outro.nome}</p>
+          <ul className="divide-y divide-tinta-line/50 overflow-hidden rounded-xl border border-tinta-line/70 text-sm">
+            {outro.jogadores.map((j) => (
+              <li key={j.profileId} className="flex items-center justify-between gap-2 px-3 py-2">
+                <span className="min-w-0 truncate">{j.nome ?? 'Jogador'}</span>
+                <Button
+                  className="shrink-0 !px-3 !py-1.5 !text-[0.8rem]"
+                  disabled={ocupado || cheio}
+                  onClick={() => onMover(j.profileId)}
+                >
+                  Subir
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </Card>
   );
 }
 
