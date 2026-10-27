@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '../lib/api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { api, ApiError } from '../lib/api';
 import { useOrg } from '../lib/org';
-import { Card, Eyebrow, MiniCartinha, Select, Spinner } from '../components/ui';
+import { Aviso, Card, Eyebrow, MiniCartinha, Select, Spinner } from '../components/ui';
 
 interface LinhaRanking {
   profileId: string;
@@ -16,10 +16,69 @@ interface ArtilhariaResp {
   ranking: LinhaRanking[];
 }
 
+interface GolEditavel {
+  id: string;
+  jogoId: string;
+  partida: string;
+  timeNome: string;
+  profileId: string;
+  nome: string | null;
+  jogadores: { profileId: string; nome: string | null }[];
+}
+
+/** Admin corrige quem fez cada gol da pelada escolhida (inclusive de partidas já concluídas). */
+function EditarGols({ peladaId }: { peladaId: string }) {
+  const qc = useQueryClient();
+  const gols = useQuery({
+    queryKey: ['gols-editaveis', peladaId],
+    queryFn: () => api<{ gols: GolEditavel[] }>(`/peladas/${peladaId}/gols`),
+  });
+  const trocar = useMutation({
+    mutationFn: (v: { jogoId: string; id: string; profileId: string }) =>
+      api(`/partidas/${v.jogoId}/gols/${v.id}`, { method: 'PATCH', json: { profileId: v.profileId } }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['gols-editaveis', peladaId] });
+      void qc.invalidateQueries({ queryKey: ['artilharia'] });
+    },
+  });
+
+  if (gols.isLoading) return <Spinner className="h-5 w-5 text-campo-600" />;
+  if (!gols.data || gols.data.gols.length === 0) return null;
+
+  return (
+    <section>
+      <Eyebrow>Corrigir gols</Eyebrow>
+      {trocar.error && (
+        <Aviso tipo="erro">{trocar.error instanceof ApiError ? trocar.error.message : 'Não foi possível salvar.'}</Aviso>
+      )}
+      <ul className="mt-2 flex flex-col gap-2">
+        {gols.data.gols.map((g) => (
+          <li key={g.id} className="rounded-2xl border border-tinta-line/70 bg-gramado-raised p-3">
+            <p className="text-xs text-tinta-faint">{g.partida} · gol do {g.timeNome}</p>
+            <Select
+              aria-label="Autor do gol"
+              className="mt-1.5"
+              value={g.profileId}
+              disabled={trocar.isPending}
+              onChange={(e) => trocar.mutate({ jogoId: g.jogoId, id: g.id, profileId: e.target.value })}
+            >
+              {g.jogadores.map((j) => (
+                <option key={j.profileId} value={j.profileId}>
+                  {j.nome ?? 'Jogador'}
+                </option>
+              ))}
+            </Select>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 const MEDALHA = ['bg-ouro-500 text-white', 'bg-tinta-line text-tinta-soft', 'bg-barro-500/70 text-white'];
 
 export function Artilharia() {
-  const { orgId } = useOrg();
+  const { orgId, admin } = useOrg();
   const [periodo, setPeriodo] = useState('mes');
   // Vazio = todas; com uma pelada escolhida, o período não se aplica.
   const [peladaId, setPeladaId] = useState('');
@@ -74,6 +133,8 @@ export function Artilharia() {
           ))}
         </Select>
       )}
+
+      {admin && peladaId && <EditarGols peladaId={peladaId} />}
 
       {isLoading ? (
         <Spinner className="h-6 w-6 text-campo-600" />

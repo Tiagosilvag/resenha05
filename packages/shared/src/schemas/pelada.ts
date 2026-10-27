@@ -104,6 +104,11 @@ export const golPartidaSchema = z.object({
   profileId: z.string().uuid(),
 });
 
+/** Troca quem fez o gol (lançado no jogador errado); o time e o placar não mudam. */
+export const corrigirGolSchema = z.object({
+  profileId: z.string().uuid(),
+});
+
 export const encerrarPartidaSchema = z.object({
   observacao: z.string().trim().max(200).optional(),
 });
