@@ -3,23 +3,21 @@ import { Aviso, Button, Estrelas, Select } from '../../components/ui';
 
 export interface TimeParaEditar {
   numero: number;
-  totalEstrelas: number;
   jogadores: { profileId: string; nome: string | null; estrelas: number }[];
 }
 
 /**
- * Edição manual de um time do sorteio (rascunho): mandar jogadores do time para
- * outro e trazer jogadores de outros times. Cada movimento vale na hora.
+ * Edição manual dos times do sorteio (rascunho): todos os times numa tela só,
+ * cada jogador com um "mover para" — um mecanismo só, sem repetir a lista de
+ * cada time duas vezes. Cada movimento vale na hora.
  */
-export function EditarTimeModal({
-  numero,
+export function EditarTimesModal({
   times,
   aoMover,
   movendo,
   erro,
   onFechar,
 }: {
-  numero: number;
   times: TimeParaEditar[];
   aoMover: (profileId: string, timeNumero: number) => void;
   movendo: boolean;
@@ -34,10 +32,6 @@ export function EditarTimeModal({
     return () => window.removeEventListener('keydown', aoTeclar);
   }, [onFechar]);
 
-  const time = times.find((t) => t.numero === numero);
-  const outros = times.filter((t) => t.numero !== numero);
-  if (!time) return null;
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 sm:items-center"
@@ -46,14 +40,12 @@ export function EditarTimeModal({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={`Editar time ${time.numero}`}
+        aria-label="Editar times"
         className="flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-gramado-raised shadow-pop"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between bg-gramado-dark px-4 py-3 text-white">
-          <h2 className="font-display text-base font-bold uppercase tracking-[0.05em] text-white">
-            Editar time {time.numero}
-          </h2>
+          <h2 className="font-display text-base font-bold uppercase tracking-[0.05em] text-white">Editar times</h2>
           <button
             type="button"
             aria-label="Fechar"
@@ -72,60 +64,39 @@ export function EditarTimeModal({
           </p>
           {erro && <Aviso tipo="erro">{erro}</Aviso>}
 
-          <section>
-            <p className="eyebrow mb-1.5">No time {time.numero} ({time.jogadores.length})</p>
-            {time.jogadores.length === 0 && (
-              <p className="text-sm text-tinta-faint">Time vazio. Traga jogadores dos outros times abaixo.</p>
-            )}
-            <ul className="divide-y divide-tinta-line/50 overflow-hidden rounded-xl border border-tinta-line/70 text-sm">
-              {time.jogadores.map((j) => (
-                <li key={j.profileId} className="flex items-center justify-between gap-2 px-3 py-2">
-                  <span className="min-w-0">
-                    <span className="block truncate">{j.nome ?? 'Jogador'}</span>
-                    <Estrelas n={j.estrelas} className="mt-0.5" />
-                  </span>
-                  <Select
-                    aria-label={`Enviar ${j.nome ?? 'jogador'} para outro time`}
-                    value=""
-                    disabled={movendo}
-                    className="!w-auto !py-1.5 !text-sm"
-                    onChange={(e) => {
-                      if (e.target.value) aoMover(j.profileId, Number(e.target.value));
-                    }}
-                  >
-                    <option value="">Enviar para…</option>
-                    {outros.map((o) => (
-                      <option key={o.numero} value={o.numero}>
-                        Time {o.numero}
-                      </option>
-                    ))}
-                  </Select>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          {outros.map((o) => (
-            <section key={o.numero}>
-              <p className="eyebrow mb-1.5">Do time {o.numero}</p>
-              {o.jogadores.length === 0 ? (
-                <p className="text-sm text-tinta-faint">Ninguém neste time.</p>
+          {times.map((t) => (
+            <section key={t.numero}>
+              <p className="eyebrow mb-1.5">
+                Time {t.numero} ({t.jogadores.length})
+              </p>
+              {t.jogadores.length === 0 ? (
+                <p className="text-sm text-tinta-faint">Time vazio.</p>
               ) : (
                 <ul className="divide-y divide-tinta-line/50 overflow-hidden rounded-xl border border-tinta-line/70 text-sm">
-                  {o.jogadores.map((j) => (
+                  {t.jogadores.map((j) => (
                     <li key={j.profileId} className="flex items-center justify-between gap-2 px-3 py-2">
                       <span className="min-w-0">
                         <span className="block truncate">{j.nome ?? 'Jogador'}</span>
                         <Estrelas n={j.estrelas} className="mt-0.5" />
                       </span>
-                      <Button
-                        variante="secundario"
-                        className="shrink-0 !px-3 !py-1.5 !text-[0.8rem]"
+                      <Select
+                        aria-label={`Mover ${j.nome ?? 'jogador'} para outro time`}
+                        value=""
                         disabled={movendo}
-                        onClick={() => aoMover(j.profileId, time.numero)}
+                        className="!w-auto !py-1.5 !text-sm"
+                        onChange={(e) => {
+                          if (e.target.value) aoMover(j.profileId, Number(e.target.value));
+                        }}
                       >
-                        Trazer
-                      </Button>
+                        <option value="">Mover para…</option>
+                        {times
+                          .filter((o) => o.numero !== t.numero)
+                          .map((o) => (
+                            <option key={o.numero} value={o.numero}>
+                              Time {o.numero}
+                            </option>
+                          ))}
+                      </Select>
                     </li>
                   ))}
                 </ul>

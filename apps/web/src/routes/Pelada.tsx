@@ -11,9 +11,9 @@ import {
 import { useAuth } from '../lib/auth';
 import { api, ApiError, baixarPng } from '../lib/api';
 import { formatarReais } from '../lib/dinheiro';
-import { Aviso, Button, Card, Chip, Estrelas, Eyebrow, Input, MiniCartinha, Spinner, StatTile } from '../components/ui';
+import { Aviso, Button, Card, Chip, Estrelas, Eyebrow, Input, MiniCartinha, Select, Spinner, StatTile } from '../components/ui';
 import { CartinhaModal } from '../components/Cartinha';
-import { EditarTimeModal } from './pelada/EditarTimeModal';
+import { EditarTimesModal } from './pelada/EditarTimesModal';
 
 interface Presenca {
   profileId: string;
@@ -419,9 +419,16 @@ interface MembroOrg {
   fotoRecortada: boolean;
 }
 
+interface JogadorForaDoTime {
+  profileId: string;
+  nome: string | null;
+  estrelas: number;
+}
+
 interface SorteioResp {
   sorteio: { id: string; confirmado: boolean } | null;
   times: TimeResultado[];
+  foraDosTimes: JogadorForaDoTime[];
 }
 
 function ValorDaPelada({
@@ -514,12 +521,9 @@ function BotaoBaixarArte({ peladaId }: { peladaId: string }) {
 function GradeDeTimes({
   times,
   onVerJogador,
-  aoEditar,
 }: {
   times: TimeResultado[];
   onVerJogador: (j: { id: string; nome: string | null }) => void;
-  /** Se informado, cada time ganha o botão "Editar time" (rascunho do admin). */
-  aoEditar?: (numero: number) => void;
 }) {
   return (
     <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
@@ -527,19 +531,7 @@ function GradeDeTimes({
         <div key={t.numero} className="overflow-hidden rounded-xl border border-tinta-line/70">
           <div className="flex items-center justify-between bg-gramado-dark px-3 py-2 text-white">
             <span className="font-display text-sm font-bold uppercase tracking-[0.05em]">Time {t.numero}</span>
-            <span className="flex items-center gap-2">
-              <Estrelas n={t.totalEstrelas / Math.max(1, t.jogadores.length)} />
-              {aoEditar && (
-                <button
-                  type="button"
-                  aria-label={`Editar time ${t.numero}`}
-                  onClick={() => aoEditar(t.numero)}
-                  className="rounded-md border border-white/30 px-2 py-0.5 font-display text-[0.7rem] font-semibold uppercase tracking-[0.04em] text-white hover:bg-white/10"
-                >
-                  Editar time
-                </button>
-              )}
-            </span>
+            <Estrelas n={t.totalEstrelas / Math.max(1, t.jogadores.length)} />
           </div>
           <ul className="divide-y divide-tinta-line/50 bg-gramado-raised text-sm">
             {t.jogadores.map((j) => (
@@ -558,6 +550,60 @@ function GradeDeTimes({
         </div>
       ))}
     </div>
+  );
+}
+
+/**
+ * Quem confirmou ou pagou depois do sorteio (ou chegou atrasado) e ainda não
+ * está em nenhum time — encaixa direto, mesmo com o sorteio já confirmado.
+ */
+function ForaDosTimes({
+  jogadores,
+  times,
+  erro,
+  encaixando,
+  onEncaixar,
+}: {
+  jogadores: JogadorForaDoTime[];
+  times: number[];
+  erro: string | null;
+  encaixando: boolean;
+  onEncaixar: (profileId: string, timeNumero: number) => void;
+}) {
+  return (
+    <section className="mt-3 rounded-xl border border-ouro-500/40 p-3">
+      <p className="eyebrow mb-1">Ficaram de fora do sorteio ({jogadores.length})</p>
+      <p className="mb-2 text-xs text-tinta-faint">
+        Confirmaram ou pagaram depois do sorteio, ou chegaram atrasados — encaixe direto num time.
+      </p>
+      {erro && <Aviso tipo="erro">{erro}</Aviso>}
+      <ul className="divide-y divide-tinta-line/50 overflow-hidden rounded-xl border border-tinta-line/70 bg-gramado-raised text-sm">
+        {jogadores.map((j) => (
+          <li key={j.profileId} className="flex items-center justify-between gap-2 px-3 py-2">
+            <span className="min-w-0">
+              <span className="block truncate">{j.nome ?? 'Jogador'}</span>
+              <Estrelas n={j.estrelas} className="mt-0.5" />
+            </span>
+            <Select
+              aria-label={`Colocar ${j.nome ?? 'jogador'} num time`}
+              value=""
+              disabled={encaixando}
+              className="!w-auto !py-1.5 !text-sm"
+              onChange={(e) => {
+                if (e.target.value) onEncaixar(j.profileId, Number(e.target.value));
+              }}
+            >
+              <option value="">Colocar no time…</option>
+              {times.map((n) => (
+                <option key={n} value={n}>
+                  Time {n}
+                </option>
+              ))}
+            </Select>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -794,7 +840,7 @@ function PainelSorteio({
   const [quantidade, setQuantidade] = useState('2');
   const [erro, setErro] = useState<string | null>(null);
   const [verCard, setVerCard] = useState<{ id: string; nome: string | null } | null>(null);
-  const [editando, setEditando] = useState<number | null>(null);
+  const [editandoAberto, setEditandoAberto] = useState(false);
 
   const digitado = Number(quantidade);
   const valido = quantidade !== '' && Number.isFinite(digitado) && digitado >= 1;
@@ -825,6 +871,7 @@ function PainelSorteio({
   });
 
   const times = atual.data?.times ?? [];
+  const foraDosTimes = atual.data?.foraDosTimes ?? [];
   const confirmado = atual.data?.sorteio?.confirmado ?? false;
   const amplitude = amplitudeEntreTimesCheios(times);
 
@@ -846,6 +893,11 @@ function PainelSorteio({
   const mover = useMutation({
     mutationFn: (v: { profileId: string; timeNumero: number }) =>
       api(`/peladas/${peladaId}/sorteio/mover`, { method: 'POST', json: v }),
+    ...aposAcao,
+  });
+  const encaixar = useMutation({
+    mutationFn: (v: { profileId: string; timeNumero: number }) =>
+      api(`/peladas/${peladaId}/sorteio/encaixar`, { method: 'POST', json: v }),
     ...aposAcao,
   });
 
@@ -943,21 +995,32 @@ function PainelSorteio({
       {times.length > 0 && <LinkPartidas peladaId={peladaId} />}
       {times.length > 0 && <BotaoBaixarArte peladaId={peladaId} />}
 
-      <GradeDeTimes
-        times={times}
-        onVerJogador={setVerCard}
-        {...(confirmado ? {} : { aoEditar: setEditando })}
-      />
+      {times.length > 0 && !confirmado && (
+        <Button variante="secundario" className="mt-2" onClick={() => setEditandoAberto(true)}>
+          Editar times
+        </Button>
+      )}
 
-      {editando !== null && !confirmado && (
-        <EditarTimeModal
-          numero={editando}
+      <GradeDeTimes times={times} onVerJogador={setVerCard} />
+
+      {times.length > 0 && foraDosTimes.length > 0 && (
+        <ForaDosTimes
+          jogadores={foraDosTimes}
+          times={times.map((t) => t.numero)}
+          erro={erro}
+          encaixando={encaixar.isPending}
+          onEncaixar={(profileId, timeNumero) => encaixar.mutate({ profileId, timeNumero })}
+        />
+      )}
+
+      {editandoAberto && !confirmado && (
+        <EditarTimesModal
           times={times}
           aoMover={(profileId, timeNumero) => mover.mutate({ profileId, timeNumero })}
           movendo={mover.isPending}
           erro={erro}
           onFechar={() => {
-            setEditando(null);
+            setEditandoAberto(false);
             setErro(null);
           }}
         />

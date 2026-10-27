@@ -78,7 +78,11 @@ export const sortearSchema = z
   });
 export type SortearInput = z.infer<typeof sortearSchema>;
 
-/** Admin move um jogador de um time para outro do sorteio (ainda em rascunho). */
+/**
+ * Admin move um jogador de um time para outro do sorteio (ainda em rascunho),
+ * ou encaixa num time alguém que ficou de fora (confirmou/pagou depois, ou
+ * chegou atrasado — este último funciona mesmo com o sorteio já confirmado).
+ */
 export const moverJogadorSorteioSchema = z.object({
   profileId: z.string().uuid(),
   timeNumero: z.number().int().min(1).max(32),

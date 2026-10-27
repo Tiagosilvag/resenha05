@@ -153,7 +153,9 @@ export const rotasSorteio: FastifyPluginAsync = async (app) => {
 
     // Rascunho só para administradores; os participantes veem depois de confirmado.
     const sorteio = await ultimoSorteio(peladaId);
-    if (!sorteio || (!ehAdmin(vinculo.papel) && !sorteio.confirmado)) return { sorteio: null, times: [] };
+    if (!sorteio || (!ehAdmin(vinculo.papel) && !sorteio.confirmado)) {
+      return { sorteio: null, times: [], foraDosTimes: [] };
+    }
 
     const linhas = await db
       .selectFrom('times as t')
@@ -172,6 +174,7 @@ export const rotasSorteio: FastifyPluginAsync = async (app) => {
       .execute();
 
     const mapa = new Map<number, { numero: number; jogadores: unknown[]; totalEstrelas: number }>();
+    const jaNumTime = new Set<string>();
     for (const l of linhas) {
       let time = mapa.get(l.numero);
       if (!time) {
@@ -186,8 +189,36 @@ export const rotasSorteio: FastifyPluginAsync = async (app) => {
           estrelas: l.estrelas,
         });
         time.totalEstrelas += l.estrelas ?? 0;
+        jaNumTime.add(l.profileId);
       }
     }
+
+    // Quem ficou de fora do sorteio (confirmou/pagou depois, ou chegou
+    // atrasado) e dá pra encaixar direto num time. Só o admin vê essa lista.
+    let foraDosTimes: { profileId: string; nome: string | null; fotoUrl: string | null; estrelas: number }[] = [];
+    if (ehAdmin(vinculo.papel)) {
+      const statusQueEntram = statusNoSorteio(pelada.valor);
+      const elegiveis = await db
+        .selectFrom('presencas as pr')
+        .innerJoin('profiles as p', 'p.id', 'pr.profile_id')
+        .leftJoin('organizacao_membros as m', (j) =>
+          j.onRef('m.profile_id', '=', 'pr.profile_id').on('m.organizacao_id', '=', pelada.organizacao_id),
+        )
+        .select([
+          'pr.profile_id as profileId',
+          'p.nome as nome',
+          'p.foto_url as fotoUrl',
+          'm.estrelas as estrelas',
+          'pr.status as status',
+        ])
+        .where('pr.pelada_id', '=', peladaId)
+        .where('pr.status', 'in', statusQueEntram)
+        .execute();
+      foraDosTimes = elegiveis
+        .filter((e) => !jaNumTime.has(e.profileId))
+        .map((e) => ({ profileId: e.profileId, nome: e.nome, fotoUrl: e.fotoUrl, estrelas: e.estrelas ?? 3 }));
+    }
+
     return {
       sorteio: {
         id: sorteio.id,
@@ -196,6 +227,7 @@ export const rotasSorteio: FastifyPluginAsync = async (app) => {
         confirmado: sorteio.confirmado,
       },
       times: [...mapa.values()].sort((a, b) => a.numero - b.numero),
+      foraDosTimes,
     };
   });
 
@@ -272,6 +304,59 @@ export const rotasSorteio: FastifyPluginAsync = async (app) => {
         .where('profile_id', '=', profileId)
         .execute();
     }
+    return { ok: true };
+  });
+
+  // Encaixa alguém que ficou de fora do sorteio (confirmou/pagou depois, ou
+  // chegou atrasado) direto num time — ao contrário de /mover, funciona
+  // mesmo com o sorteio já confirmado (não mexe em quem já está nos times).
+  app.post('/peladas/:peladaId/sorteio/encaixar', async (req) => {
+    const { peladaId } = req.params as { peladaId: string };
+    const pelada = await peladaComOrg(peladaId);
+    exigirAdmin(req, pelada.organizacao_id);
+    const { profileId, timeNumero } = validar(moverJogadorSorteioSchema, req.body);
+
+    const sorteio = await ultimoSorteio(peladaId);
+    if (!sorteio) throw erro.naoEncontrado('Esta pelada ainda não teve sorteio.');
+
+    const destino = await db
+      .selectFrom('times')
+      .select('id')
+      .where('sorteio_id', '=', sorteio.id)
+      .where('numero', '=', timeNumero)
+      .executeTakeFirst();
+    if (!destino) throw erro.naoEncontrado(`O time ${timeNumero} não existe neste sorteio.`);
+
+    const jaEsta = await db
+      .selectFrom('time_jogadores as tj')
+      .innerJoin('times as t', 't.id', 'tj.time_id')
+      .select('tj.time_id')
+      .where('t.sorteio_id', '=', sorteio.id)
+      .where('tj.profile_id', '=', profileId)
+      .executeTakeFirst();
+    if (jaEsta) throw erro.conflito('Este jogador já está num time deste sorteio.');
+
+    const presenca = await db
+      .selectFrom('presencas as pr')
+      .leftJoin('organizacao_membros as m', (j) =>
+        j.onRef('m.profile_id', '=', 'pr.profile_id').on('m.organizacao_id', '=', pelada.organizacao_id),
+      )
+      .select(['pr.status as status', 'm.estrelas as estrelas'])
+      .where('pr.pelada_id', '=', peladaId)
+      .where('pr.profile_id', '=', profileId)
+      .executeTakeFirst();
+    if (!presenca || !statusNoSorteio(pelada.valor).includes(presenca.status as 'confirmado' | 'pago')) {
+      throw erro.invalido('Esse jogador não está elegível para entrar no sorteio desta pelada.');
+    }
+
+    await db
+      .insertInto('time_jogadores')
+      .values({
+        time_id: destino.id,
+        profile_id: profileId,
+        estrelas: Math.min(5, Math.max(1, Math.round(presenca.estrelas ?? 3))),
+      })
+      .execute();
     return { ok: true };
   });
 
