@@ -82,6 +82,40 @@ describe('sortearTimes', () => {
   it('rejeita menos jogadores que times', () => {
     expect(() => sortearTimes(gerar({ 3: 3 }), 4)).toThrow();
   });
+
+  it('espalha os jogadores de 1 estrela o mais igual possível entre os times (nunca mais que o inevitável)', () => {
+    // Varia contagens de "outros" e de 1-estrela, times e sementes — não só casos
+    // onde a serpentina já acerta por acaso (contagens múltiplas do ciclo dela).
+    let piorCaso = '';
+    for (let caso = 0; caso < 150; caso++) {
+      let a = (caso + 1) >>> 0;
+      const rand = () => {
+        a = (a * 1664525 + 1013904223) >>> 0;
+        return a / 4294967296;
+      };
+      const nTimes = 2 + Math.floor(rand() * 5); // 2..6
+      const umaEstrela = 1 + Math.floor(rand() * (nTimes + 3)); // varia em torno de nTimes
+      const outros = nTimes + Math.floor(rand() * 20);
+      const jogadores: JogadorSorteio[] = [
+        ...gerar({ 1: umaEstrela }),
+        ...Array.from({ length: outros }, (_, i) => ({
+          profileId: `o${caso}-${i}`,
+          nome: `Outro ${i}`,
+          estrelas: 2 + Math.floor(rand() * 4), // 2..5
+        })),
+      ];
+      if (jogadores.length < nTimes) continue;
+
+      const times = sortearTimes(jogadores, nTimes, { seed: caso });
+      const porTime = times.map((t) => t.jogadores.filter((j) => j.estrelas === 1).length);
+      const maximoInevitavel = Math.ceil(umaEstrela / nTimes);
+      if (Math.max(...porTime) > maximoInevitavel) {
+        piorCaso = `nTimes=${nTimes} umaEstrela=${umaEstrela} outros=${outros} seed=${caso} -> ${porTime} (máximo deveria ser ${maximoInevitavel})`;
+        break;
+      }
+    }
+    expect(piorCaso).toBe('');
+  });
 });
 
 describe('peladaExigePagamento', () => {

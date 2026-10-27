@@ -99,12 +99,18 @@ export function sortearTimes(
     }
   }
 
+  espalharUmaEstrela(times);
   equilibrar(times);
   return times;
 }
 
 function estrelasDe(j: JogadorSorteio): number {
   return Math.min(5, Math.max(1, Math.round(j.estrelas)));
+}
+
+/** Quantos jogadores de 1 estrela (o nível mais fraco) um time já tem. */
+function contarUmaEstrela(t: TimeSorteado): number {
+  return t.jogadores.filter((j) => estrelasDe(j) === 1).length;
 }
 
 /**
@@ -190,10 +196,13 @@ export function amplitudeEntreTimesCheios(
  * diferenças de 3–4 estrelas em distribuições irregulares.
  *
  * As trocas são sempre 1 por 1, então os tamanhos dos times não mudam, e a
- * escolha é determinística — mesma semente, mesmo resultado.
+ * escolha é determinística — mesma semente, mesmo resultado. Nunca faz uma
+ * troca que junte dois jogadores de 1 estrela num time que tinha no máximo 1
+ * — isso já foi resolvido por `espalharUmaEstrela` antes desta função rodar,
+ * e aqui não pode ser desfeito.
  */
 function equilibrar(times: TimeSorteado[], maxPassos = 200): void {
-  const estrela = (j: JogadorSorteio) => Math.min(5, Math.max(1, Math.round(j.estrelas)));
+  const estrela = estrelasDe;
 
   for (let passo = 0; passo < maxPassos; passo++) {
     let forte = times[0]!;
@@ -206,11 +215,20 @@ function equilibrar(times: TimeSorteado[], maxPassos = 200): void {
     // 1 estrela é a paridade possível quando a soma total é ímpar.
     if (distancia <= 1) return;
 
+    const umEstrelaNoForte = contarUmaEstrela(forte);
+
     let melhor: { i: number; j: number; distancia: number } | null = null;
     for (let i = 0; i < forte.jogadores.length; i++) {
       for (let j = 0; j < fraco.jogadores.length; j++) {
-        const ganho = estrela(forte.jogadores[i]!) - estrela(fraco.jogadores[j]!);
+        const indoPraFraco = forte.jogadores[i]!;
+        const indoPraForte = fraco.jogadores[j]!;
+        const ganho = estrela(indoPraFraco) - estrela(indoPraForte);
         if (ganho <= 0) continue;
+        // indoPraForte vai pro time forte — se for de 1 estrela e o forte já
+        // tiver um, juntaria dois no mesmo time. (indoPraFraco nunca pode ser
+        // de 1 estrela aqui: ganho > 0 exige estrela mais alta que a do
+        // indoPraForte, e 1 já é o mínimo possível.)
+        if (estrela(indoPraForte) === 1 && umEstrelaNoForte >= 1) continue;
         const nova = Math.abs(distancia - 2 * ganho);
         if (nova < distancia && (!melhor || nova < melhor.distancia)) {
           melhor = { i, j, distancia: nova };
@@ -226,6 +244,58 @@ function equilibrar(times: TimeSorteado[], maxPassos = 200): void {
     const ganho = estrela(doForte) - estrela(doFraco);
     forte.totalEstrelas -= ganho;
     fraco.totalEstrelas += ganho;
+  }
+}
+
+/**
+ * Jogador de 1 estrela é o nível mais fraco — dois no mesmo time deixam esse
+ * time em desvantagem maior do que a soma de estrelas sozinha mostra. Troca
+ * 1 por 1 até sobrar no máximo 1 jogador de 1 estrela por time; quando tem
+ * mais jogadores de 1 estrela do que times, o excesso é inevitável e fica o
+ * mais igual possível entre os times (nunca 2 de diferença).
+ *
+ * Roda ANTES de `equilibrar` — a distribuição de estrelas que sai daqui pode
+ * ficar mais desigual, mas `equilibrar` conserta o que der sem desfazer o
+ * espalhamento (ver o comentário lá). Troca sempre pelo jogador do time
+ * receptor com menos estrelas (o "mais barato" de ceder), nunca por outro
+ * jogador de 1 estrela.
+ */
+function espalharUmaEstrela(times: TimeSorteado[], maxPassos = 200): void {
+  const estrela = estrelasDe;
+
+  for (let passo = 0; passo < maxPassos; passo++) {
+    let pior = times[0]!;
+    for (const t of times) {
+      if (contarUmaEstrela(t) > contarUmaEstrela(pior)) pior = t;
+    }
+    if (contarUmaEstrela(pior) < 2) return; // ninguém com 2+ de 1 estrela — já está bom
+
+    let receptor: TimeSorteado | null = null;
+    for (const t of times) {
+      if (t === pior) continue;
+      if (t.jogadores.every((j) => estrela(j) === 1)) continue; // nada pra oferecer em troca
+      if (!receptor || contarUmaEstrela(t) < contarUmaEstrela(receptor)) receptor = t;
+    }
+    // Sem receptor, ou a troca só trocaria qual time é o "pior" (sem reduzir
+    // a diferença): já é o melhor espalhamento possível.
+    if (!receptor || contarUmaEstrela(receptor) >= contarUmaEstrela(pior) - 1) return;
+
+    const iDoPior = pior.jogadores.findIndex((j) => estrela(j) === 1);
+    let jDoReceptor = -1;
+    for (let j = 0; j < receptor.jogadores.length; j++) {
+      if (estrela(receptor.jogadores[j]!) === 1) continue;
+      if (jDoReceptor === -1 || estrela(receptor.jogadores[j]!) < estrela(receptor.jogadores[jDoReceptor]!)) {
+        jDoReceptor = j;
+      }
+    }
+
+    const doPior = pior.jogadores[iDoPior]!;
+    const doReceptor = receptor.jogadores[jDoReceptor]!;
+    pior.jogadores[iDoPior] = doReceptor;
+    receptor.jogadores[jDoReceptor] = doPior;
+    const ganho = estrela(doPior) - estrela(doReceptor);
+    pior.totalEstrelas -= ganho;
+    receptor.totalEstrelas += ganho;
   }
 }
 
