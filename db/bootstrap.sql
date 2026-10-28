@@ -852,5 +852,18 @@ create table oauth_estados (
 INSERT INTO _migrations (nome) VALUES ('0016_pagamento_jogadores.sql') ON CONFLICT DO NOTHING;
 COMMIT;
 
+-- ============================ 0017_bloqueio_criacao_organizacoes.sql ============================
+\echo '== 0017_bloqueio_criacao_organizacoes.sql =='
+BEGIN;
+-- =============================================================================
+-- Trava global de criação de organizações, ligada pelo painel de dev enquanto
+-- a plataforma está em fase de testes.
+-- =============================================================================
+
+alter table plataforma_config
+  add column criacao_organizacoes_bloqueada boolean not null default false;
+INSERT INTO _migrations (nome) VALUES ('0017_bloqueio_criacao_organizacoes.sql') ON CONFLICT DO NOTHING;
+COMMIT;
+
 \echo ''
 \echo 'Pronto. Schema resenha05 criado. Deploys seguintes: node db/migrate.mjs'

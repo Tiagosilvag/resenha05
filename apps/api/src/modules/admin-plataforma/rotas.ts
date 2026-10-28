@@ -10,6 +10,7 @@ import {
   cadastrarAdminPlataformaSchema,
   trocarDonoOrganizacaoSchema,
   configurarMensalidadeSchema,
+  bloquearCriacaoOrganizacoesSchema,
   conectarMercadoPagoGeralSchema,
   configurarWebhookSecretSchema,
 } from '@resenha05/shared';
@@ -294,6 +295,7 @@ export const rotasAdminPlataforma: FastifyPluginAsync = async (app) => {
       .selectFrom('plataforma_config')
       .select([
         'mensalidade_valor_centavos as mensalidadeValorCentavos',
+        'criacao_organizacoes_bloqueada as criacaoOrganizacoesBloqueada',
         'mp_geral_token_atualizado_em as mpGeralAtualizadoEm',
         'mp_geral_webhook_secret_atualizado_em as webhookAtualizadoEm',
       ])
@@ -301,6 +303,7 @@ export const rotasAdminPlataforma: FastifyPluginAsync = async (app) => {
       .executeTakeFirstOrThrow();
     return {
       mensalidadeValorCentavos: cfg.mensalidadeValorCentavos,
+      criacaoOrganizacoesBloqueada: cfg.criacaoOrganizacoesBloqueada,
       mercadoPagoConectado: cfg.mpGeralAtualizadoEm != null,
       mpGeralAtualizadoEm: cfg.mpGeralAtualizadoEm,
       webhookConfigurado: cfg.webhookAtualizadoEm != null,
@@ -313,6 +316,18 @@ export const rotasAdminPlataforma: FastifyPluginAsync = async (app) => {
     await db
       .updateTable('plataforma_config')
       .set({ mensalidade_valor_centavos: valorCentavos, atualizado_em: new Date() })
+      .where('id', '=', 1)
+      .execute();
+    return { ok: true };
+  });
+
+  // Trava global enquanto a plataforma está em testes: só o dev liga/desliga.
+  app.put('/admin/configuracoes/bloqueio-criacao-organizacoes', async (req) => {
+    exigirDev(req);
+    const { bloqueada } = validar(bloquearCriacaoOrganizacoesSchema, req.body);
+    await db
+      .updateTable('plataforma_config')
+      .set({ criacao_organizacoes_bloqueada: bloqueada, atualizado_em: new Date() })
       .where('id', '=', 1)
       .execute();
     return { ok: true };
