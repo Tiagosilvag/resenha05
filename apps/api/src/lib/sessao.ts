@@ -46,7 +46,8 @@ export async function carregarUsuario(profileId: string): Promise<SessaoUsuario>
 
   // Admin da plataforma administra qualquer organização, mesmo sem ser membro:
   // entra com o papel de dono, para também mexer no que é só do dono (valor da
-  // pelada, forma de pagamento, encerrar a organização).
+  // pelada, forma de pagamento, encerrar a organização). Vale também onde ele já
+  // é membro com outro papel (jogador ou admin comum).
   if (papelPlataforma) {
     const minhas = new Set(orgs.map((o) => o.id));
     const todas = await db
@@ -61,6 +62,7 @@ export async function carregarUsuario(profileId: string): Promise<SessaoUsuario>
       ])
       .orderBy('o.nome')
       .execute();
+    for (const o of orgs) o.papel = 'admin_principal';
     orgs.push(...todas.filter((o) => !minhas.has(o.id)));
     orgs.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   }
