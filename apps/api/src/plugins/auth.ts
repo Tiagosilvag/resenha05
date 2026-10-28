@@ -60,6 +60,15 @@ export function exigirDono(req: FastifyRequest, orgId: string): OrganizacaoDoUsu
   return vinculo;
 }
 
+/** Dono da organização ou admin da plataforma (que administra qualquer organização). */
+export function exigirDonoOuAdminPlataforma(req: FastifyRequest, orgId: string): OrganizacaoDoUsuario {
+  const vinculo = exigirMembro(req, orgId);
+  if (vinculo.papel !== 'admin_principal' && req.usuario.papelPlataforma == null) {
+    throw erro.proibido('Ação restrita ao administrador principal.');
+  }
+  return vinculo;
+}
+
 export function exigirAdminPlataforma(req: FastifyRequest): void {
   if (req.usuario.papelPlataforma == null) {
     throw erro.proibido('Ação restrita a administradores da plataforma.');
