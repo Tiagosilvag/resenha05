@@ -3,10 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../../lib/api';
 import { formatarCentavos } from '../../lib/dinheiro';
 import { Aviso, Button, Card, Input, Spinner } from '../../components/ui';
+import { useAuth } from '../../lib/auth';
 import { AdminDiagnosticoMp } from './AdminDiagnosticoMp';
 
 interface Configuracoes {
   mensalidadeValorCentavos: number;
+  criacaoOrganizacoesBloqueada: boolean;
   mercadoPagoConectado: boolean;
   mpGeralAtualizadoEm: string | null;
   webhookConfigurado: boolean;
@@ -18,6 +20,15 @@ export function AdminConfiguracoes() {
   const { data, isLoading } = useQuery({
     queryKey: ['admin-configuracoes'],
     queryFn: () => api<Configuracoes>('/admin/configuracoes'),
+  });
+
+  const souDev = useAuth().usuario?.papelPlataforma === 'dev';
+  const [erroBloqueio, setErroBloqueio] = useState<string | null>(null);
+  const alternarBloqueio = useMutation({
+    mutationFn: (bloqueada: boolean) =>
+      api('/admin/configuracoes/bloqueio-criacao-organizacoes', { method: 'PUT', json: { bloqueada } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-configuracoes'] }),
+    onError: (e) => setErroBloqueio(e instanceof ApiError ? e.message : 'Não foi possível salvar.'),
   });
 
   const [valorReais, setValorReais] = useState('');
@@ -74,6 +85,36 @@ export function AdminConfiguracoes() {
 
   return (
     <div className="flex flex-col gap-4">
+      <Card>
+        <p className="eyebrow mb-1">Criação de organizações</p>
+        <p className="mb-3 text-sm text-tinta-soft">
+          {data?.criacaoOrganizacoesBloqueada
+            ? 'Bloqueada: ninguém consegue criar organizações (admins da plataforma continuam podendo).'
+            : 'Liberada: qualquer pessoa pode criar uma organização.'}
+        </p>
+        {erroBloqueio && <Aviso tipo="erro">{erroBloqueio}</Aviso>}
+        {souDev ? (
+          <Button
+            variante="secundario"
+            disabled={alternarBloqueio.isPending || !data}
+            onClick={() => {
+              setErroBloqueio(null);
+              alternarBloqueio.mutate(!data?.criacaoOrganizacoesBloqueada);
+            }}
+          >
+            {alternarBloqueio.isPending ? (
+              <Spinner />
+            ) : data?.criacaoOrganizacoesBloqueada ? (
+              'Liberar criação'
+            ) : (
+              'Bloquear criação'
+            )}
+          </Button>
+        ) : (
+          <p className="text-xs text-tinta-faint">Só o desenvolvedor pode alterar.</p>
+        )}
+      </Card>
+
       <Card>
         <p className="eyebrow mb-1">Mensalidade</p>
         <p className="mb-3 text-sm text-tinta-soft">

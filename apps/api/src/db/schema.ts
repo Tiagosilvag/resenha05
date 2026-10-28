@@ -281,6 +281,7 @@ export interface PlataformaAdminsTable {
 export interface PlataformaConfigTable {
   id: Generated<number>;
   mensalidade_valor_centavos: number;
+  criacao_organizacoes_bloqueada: Generated<boolean>;
   mp_geral_token_cipher: Buffer | null;
   mp_geral_token_nonce: Buffer | null;
   mp_geral_token_atualizado_em: Timestamp | null;

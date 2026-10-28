@@ -7,6 +7,10 @@ export const configurarMensalidadeSchema = z.object({
   valorCentavos: z.number().int().min(100, 'Valor mínimo de R$ 1,00.').max(1_000_000),
 });
 
+export const bloquearCriacaoOrganizacoesSchema = z.object({
+  bloqueada: z.boolean(),
+});
+
 export const conectarMercadoPagoGeralSchema = z.object({
   accessToken: z
     .string()

@@ -44,6 +44,14 @@ export const rotasOrganizacoes: FastifyPluginAsync = async (app) => {
   // Cria uma organização e torna o criador admin_principal.
   app.post('/organizacoes', async (req, reply) => {
     const { nome } = validar(criarOrganizacaoSchema, req.body);
+    const cfg = await db
+      .selectFrom('plataforma_config')
+      .select('criacao_organizacoes_bloqueada')
+      .where('id', '=', 1)
+      .executeTakeFirst();
+    if (cfg?.criacao_organizacoes_bloqueada && req.usuario.papelPlataforma == null) {
+      throw erro.proibido('A criação de organizações está temporariamente bloqueada.');
+    }
     const org = await db.transaction().execute(async (tx) => {
       const o = await tx
         .insertInto('organizacoes')
