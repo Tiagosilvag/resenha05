@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fimDoMes, formatarTelefone, proximoMesALiberar, type StatusAssinatura } from '@resenha05/shared';
 import { api, ApiError } from '../../lib/api';
+import { useAuth } from '../../lib/auth';
 import { formatarCentavos } from '../../lib/dinheiro';
 import { Aviso, Button, Chip, Spinner, StatTile } from '../../components/ui';
 
@@ -53,6 +54,40 @@ interface Participante {
   profileId: string;
   nome: string | null;
   telefone: string;
+}
+
+function ExcluirOrganizacao({ orgId, orgNome }: { orgId: string; orgNome: string }) {
+  const qc = useQueryClient();
+  const { recarregar } = useAuth();
+  const [erro, setErro] = useState<string | null>(null);
+  const excluir = useMutation({
+    mutationFn: () => api(`/admin/organizacoes/${orgId}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['admin-organizacoes'] });
+      void recarregar();
+    },
+    onError: (e) => setErro(e instanceof ApiError ? e.message : 'Não foi possível excluir.'),
+  });
+  return (
+    <div>
+      {erro && <Aviso tipo="erro">{erro}</Aviso>}
+      <Button
+        variante="secundario"
+        className="w-full"
+        disabled={excluir.isPending}
+        onClick={() => {
+          setErro(null);
+          const digitado = prompt(
+            `Excluir "${orgNome}" apaga peladas, partidas, torneios e vínculos, sem volta.\nDigite o nome da organização para confirmar:`,
+          );
+          if (digitado?.trim() !== orgNome) return;
+          excluir.mutate();
+        }}
+      >
+        {excluir.isPending ? <Spinner /> : 'Excluir organização'}
+      </Button>
+    </div>
+  );
 }
 
 function TrocarDono({ orgId, orgNome, donoId }: { orgId: string; orgNome: string; donoId: string }) {
@@ -194,6 +229,8 @@ export function AdminOrganizacaoDetalhe({ id }: { id: string }) {
           </Button>
         )}
       </div>
+
+      <ExcluirOrganizacao orgId={id} orgNome={data.nome} />
 
       <div>
         <p className="eyebrow mb-1">Histórico da mensalidade</p>

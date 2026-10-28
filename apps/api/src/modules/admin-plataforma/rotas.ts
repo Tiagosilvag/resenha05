@@ -199,6 +199,14 @@ export const rotasAdminPlataforma: FastifyPluginAsync = async (app) => {
   // Troca o dono (admin_principal) da organização. O antigo dono continua como
   // admin (ou jogador, se a organização já tem 5 admins); o novo vira membro
   // ativo e admin_principal.
+  // Exclui a organização (peladas, membros e torneios vão junto, em cascata).
+  app.delete('/admin/organizacoes/:id', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const r = await db.deleteFrom('organizacoes').where('id', '=', id).executeTakeFirst();
+    if (r.numDeletedRows === 0n) throw erro.naoEncontrado('Organização não encontrada.');
+    reply.code(204);
+  });
+
   app.put('/admin/organizacoes/:id/dono', async (req) => {
     const { id } = req.params as { id: string };
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
