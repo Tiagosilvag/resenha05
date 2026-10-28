@@ -44,7 +44,9 @@ export async function carregarUsuario(profileId: string): Promise<SessaoUsuario>
 
   const papelPlataforma = await resolverPapelPlataforma(p.telefone, profileId);
 
-  // Admin da plataforma administra qualquer organização, mesmo sem ser membro.
+  // Admin da plataforma administra qualquer organização, mesmo sem ser membro:
+  // entra com o papel de dono, para também mexer no que é só do dono (valor da
+  // pelada, forma de pagamento, encerrar a organização).
   if (papelPlataforma) {
     const minhas = new Set(orgs.map((o) => o.id));
     const todas = await db
@@ -53,7 +55,7 @@ export async function carregarUsuario(profileId: string): Promise<SessaoUsuario>
         'o.id as id',
         'o.nome as nome',
         'o.codigo as codigo',
-        sql<'admin'>`'admin'`.as('papel'),
+        sql<'admin_principal'>`'admin_principal'`.as('papel'),
         sql<number>`0`.as('estrelas'),
         'o.status_assinatura as statusAssinatura',
       ])
