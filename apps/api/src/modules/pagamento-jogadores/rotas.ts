@@ -10,7 +10,7 @@ import { db } from '../../db/index.js';
 import { env } from '../../env.js';
 import { validar } from '../../lib/validar.js';
 import { erro } from '../../lib/erros.js';
-import { exigirAdmin, exigirDono, exigirMembro } from '../../plugins/auth.js';
+import { exigirAdmin, exigirDonoOuAdminPlataforma, exigirMembro } from '../../plugins/auth.js';
 import { cifrarTokenOuErro } from '../../lib/cripto.js';
 import { MercadoPagoErro } from '../../lib/mercadopago-preapproval.js';
 import { criarPreferencia } from '../../lib/mercadopago-preferencia.js';
@@ -80,7 +80,7 @@ export const rotasPagamentoJogadores: FastifyPluginAsync = async (app) => {
     if (!o) throw erro.naoEncontrado('Organização não encontrada.');
     const origem = o.mp_oauth_access_cipher ? 'oauth' : o.mp_token_cipher ? 'token' : null;
     return {
-      souDono: vinculo.papel === 'admin_principal',
+      souDono: vinculo.papel === 'admin_principal' || req.usuario.papelPlataforma != null,
       modo: o.pagamento_jogador_modo,
       pix: { chave: o.pix_chave, favorecido: o.pix_favorecido, instrucoes: o.pix_instrucoes },
       mercadoPago: {
@@ -95,7 +95,7 @@ export const rotasPagamentoJogadores: FastifyPluginAsync = async (app) => {
 
   app.put('/organizacoes/:id/pagamento-jogadores', async (req) => {
     const { id } = req.params as { id: string };
-    exigirDono(req, id);
+    exigirDonoOuAdminPlataforma(req, id);
     const d = validar(configurarPagamentoJogadoresSchema, req.body);
 
     if (d.modo === 'mercadopago') {
@@ -126,7 +126,7 @@ export const rotasPagamentoJogadores: FastifyPluginAsync = async (app) => {
 
   app.post('/organizacoes/:id/mercadopago/oauth/iniciar', async (req) => {
     const { id } = req.params as { id: string };
-    exigirDono(req, id);
+    exigirDonoOuAdminPlataforma(req, id);
     if (!oauthConfigurado()) {
       throw erro.conflito('A conexão automática ainda não está disponível. Fale com o suporte.');
     }
@@ -148,7 +148,7 @@ export const rotasPagamentoJogadores: FastifyPluginAsync = async (app) => {
 
   app.delete('/organizacoes/:id/mercadopago/oauth', async (req, reply) => {
     const { id } = req.params as { id: string };
-    exigirDono(req, id);
+    exigirDonoOuAdminPlataforma(req, id);
     await db
       .updateTable('organizacoes')
       .set({
