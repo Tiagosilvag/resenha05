@@ -425,6 +425,17 @@ export const rotasPeladas: FastifyPluginAsync = async (app) => {
       const { peladaId, profileId } = req.params as { peladaId: string; profileId: string };
       const pelada = await orgDaPelada(req, peladaId);
       exigirAdmin(req, pelada.organizacao_id);
+      // Quem pagou pelo Mercado Pago não sai da lista (levaria o registro do pagamento junto).
+      const pagoNoMp = await db
+        .selectFrom('presencas')
+        .select('profile_id')
+        .where('pelada_id', '=', peladaId)
+        .where('profile_id', '=', profileId)
+        .where('mp_payment_id', 'is not', null)
+        .executeTakeFirst();
+      if (pagoNoMp) {
+        throw erro.conflito('Este jogador pagou pelo Mercado Pago. Para devolver, faça o estorno no Mercado Pago.');
+      }
       await db
         .deleteFrom('presencas')
         .where('pelada_id', '=', peladaId)

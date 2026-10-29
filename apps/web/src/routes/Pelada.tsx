@@ -321,7 +321,17 @@ export function Pelada() {
                   avisou que pagou
                 </span>
               )}
-              {admin && p.status !== 'desistiu' ? (
+              {admin && p.status === 'pago' && p.pagoMetodo === 'mercadopago' ? (
+                <span
+                  title="Pago pelo Mercado Pago — só se desfaz com estorno lá"
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-grama-100 px-2.5 py-0.5 font-display text-[0.7rem] font-semibold uppercase tracking-[0.05em] text-grama-800 ring-1 ring-grama-500/40"
+                >
+                  <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12.5l4.5 4.5L19 7.5" />
+                  </svg>
+                  Pago · Mercado Pago
+                </span>
+              ) : admin && p.status !== 'desistiu' ? (
                 <button
                   type="button"
                   disabled={pagamento.isPending}
@@ -340,7 +350,7 @@ export function Pelada() {
               ) : (
                 <Chip tom={p.status}>{p.status}</Chip>
               )}
-              {admin && (
+              {admin && !(p.status === 'pago' && p.pagoMetodo === 'mercadopago') && (
                 <button
                   type="button"
                   aria-label={`Tirar ${p.nome ?? 'jogador'} da lista`}
